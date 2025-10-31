@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Minefield Gamble — Basic UI</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+        :root{
+            --bg:#0f1724; --card:#0b1220; --accent:#08a0c3; --danger:#e04b4b; --muted:#98a1ad;
+            --tile:#16202b; --tile-open:#e6f7fb;
+        }
+        html,body{height:100%; margin:0; font-family:Inter,Segoe UI,Arial; background:linear-gradient(180deg,#081225 0%, #04101a 100%); color:#e6eef6}
+        .wrap{max-width:1000px;margin:28px auto;padding:20px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:12px; box-shadow:0 8px 30px rgba(2,6,23,.6)}
+        header{display:flex;gap:18px;align-items:center;justify-content:space-between}
+        h1{font-size:18px;margin:0;color:var(--accent)}
+        .controls{display:flex;gap:10px;align-items:center}
+        .panel{background:rgba(0,0,0,0.2);padding:12px;border-radius:10px;display:flex;gap:10px;align-items:center}
+        label{font-size:12px;color:var(--muted)}
+        select,input[type=number],button{background:#07121a;border:1px solid rgba(255,255,255,0.03);color:inherit;padding:8px 10px;border-radius:8px;font-size:13px}
+        button{cursor:pointer}
+        .balance{font-weight:700;font-size:18px;color:#dff9ff}
+        main{display:flex;gap:20px;margin-top:18px}
+        .left{flex:1}
+        .right{width:320px}
+        .board-wrap{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); padding:14px;border-radius:10px}
+        .grid{display:grid;gap:8px; touch-action: manipulation}
+        .tile{
+            width:56px;height:56px;border-radius:8px;background:linear-gradient(180deg,var(--tile),#0c1b24);display:flex;align-items:center;justify-content:center;color:transparent;
+            font-weight:700;font-size:16px;user-select:none;box-shadow:inset 0 -4px 8px rgba(0,0,0,.6);
+        }
+        .tile.open{background:var(--tile-open);color:#052025;box-shadow:inset 0 3px 6px rgba(0,0,0,.08)}
+        .tile.mine{background:linear-gradient(180deg,#3a1b1b,#2a0f0f);color:var(--danger);font-weight:800}
+        .status{display:flex;flex-direction:column;gap:10px}
+        .big{font-size:20px;font-weight:700}
+        .muted{color:var(--muted);font-size:13px}
+        .actions{display:flex;gap:8px}
+        .danger{background:var(--danger);border:none;color:#fff}
+        .primary{background:var(--accent);border:none;color:#06232a}
+        .small{padding:6px 8px;font-size:13px;border-radius:8px}
+        footer{margin-top:12px;color:var(--muted);font-size:12px}
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <header>
+            <div>
+                <h1>Minefield Gamble — Basic UI</h1>
+                <div class="muted">Click squares to uncover. Mines lose the round. Cash out winnings while you can.</div>
+            </div>
+
+            <div class="controls">
+                <div class="panel">
+                    <label for="userSelect">User</label>
+                    <select id="userSelect"></select>
+                    <button id="addUser" class="small">Add</button>
+                    <button id="resetUsers" class="small">Reset</button>
+                </div>
+
+                <div class="panel">
+                    <div>
+                        <div class="muted">Balance</div>
+                        <div id="balance" class="balance">--</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <div class="left">
+                <div class="board-wrap">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                        <div style="display:flex;gap:8px;align-items:center">
+                            <label class="muted">Grid</label>
+                            <select id="gridSize">
+                                <option value="5">5 × 5</option>
+                                <option value="6">6 × 6</option>
+                                <option value="7">7 × 7</option>
+                            </select>
+                            <label class="muted">Mines</label>
+                            <input id="mineCount" type="number" min="1" max="20" value="5" style="width:72px">
+                        </div>
+
+                        <div style="display:flex;gap:8px;align-items:center">
+                            <label class="muted">Bet</label>
+                            <input id="betAmount" type="number" min="1" value="10" style="width:100px">
+                            <button id="startRound" class="primary small">Start Round</button>
+                            <button id="cashOut" class="small" disabled>Cash Out</button>
+                        </div>
+                    </div>
+
+                    <div id="info" style="display:flex;gap:18px;margin-bottom:12px">
+                        <div>
+                            <div class="muted">Picked</div>
+                            <div id="pickedCount" class="big">0</div>
+                        </div>
+                        <div>
+                            <div class="muted">Potential Payout</div>
+                            <div id="payout" class="big">0</div>
+                        </div>
+                        <div>
+                            <div class="muted">Round</div>
+                            <div id="roundStatus" class="big">Idle</div>
+                        </div>
+                    </div>
+
+                    <div id="grid" class="grid"></div>
+                </div>
+            </div>
+
+            <aside class="right">
+                <div class="panel" style="flex-direction:column;gap:10px;">
+                    <div>
+                        <div class="muted">Round Log</div>
+                        <div id="log" style="height:260px;overflow:auto;font-size:13px;color:var(--muted);"></div>
+                    </div>
+
+                    <div style="display:flex;flex-direction:column;gap:8px">
+                        <button id="revealAll" class="small">Reveal All</button>
+                        <button id="newBoard" class="small">Clear Board</button>
+                    </div>
+                </div>
+                <footer>
+                    Prototype UI — client only. Balances stored locally.
+                </footer>
+            </aside>
+        </main>
+    </div>
+
+    <script>
+        // Basic client-side UI for a minefield gamble prototype.
+        // Users stored in localStorage as "mg_users".
+        const defaultUsersKey = 'mg_users_v1';
+
+        // --- Helpers ---
+        const $ = id => document.getElementById(id);
+        const fmt = v => Number(v).toFixed(2);
+
+        // --- State ---
+        let users = loadUsers();
+        let currentUserId = users.length ? users[0].id : null;
+        let game = {
+            active: false,
+            gridSize: 5,
+            mineCount: 5,
+            bet: 0,
+            board: [], // {mine:boolean, opened:boolean, index}
+            picked: 0,
+            potential: 0,
+            lockedBet: 0
+        };
+
+        // --- Init UI refs ---
+        const userSelect = $('userSelect');
+        const addUserBtn = $('addUser');
+        const resetUsersBtn = $('resetUsers');
+        const balanceEl = $('balance');
+        const gridEl = $('grid');
+        const gridSizeEl = $('gridSize');
+        const mineCountEl = $('mineCount');
+        const betEl = $('betAmount');
+        const startBtn = $('startRound');
+        const cashBtn = $('cashOut');
+        const pickedCountEl = $('pickedCount');
+        const payoutEl = $('payout');
+        const roundStatusEl = $('roundStatus');
+        const logEl = $('log');
+        const revealAllBtn = $('revealAll');
+        const newBoardBtn = $('newBoard');
+
+        // --- LocalStorage user helpers ---
+        function loadUsers(){
+            try{
+                const raw = localStorage.getItem(defaultUsersKey);
+                if(!raw) {
+                    const u = [{id: idGen(), name:'Player1', balance:100}];
+                    localStorage.setItem(defaultUsersKey, JSON.stringify(u));
+                    return u;
+                }
+                return JSON.parse(raw);
+            }catch(e){ return [{id:idGen(), name:'Player1', balance:100}]; }
+        }
+        function saveUsers(){ localStorage.setItem(defaultUsersKey, JSON.stringify(users)); }
+        function idGen(){ return 'u'+Math.random().toString(36).slice(2,9); }
+
+        // --- UI update ---
+        function refreshUserList(){
+            userSelect.innerHTML = '';
+            users.forEach(u=>{
+                const opt = document.createElement('option');
+                opt.value = u.id; opt.textContent = u.name;
+                userSelect.appendChild(opt);
+            });
+            if(!users.length) {
+                users.push({id:idGen(),name:'Player1',balance:100});
+                saveUsers();
+                refreshUserList();
+                return;
+            }
+            if(!currentUserId) currentUserId = users[0].id;
+            userSelect.value = currentUserId;
+            updateBalanceDisplay();
+        }
+        function updateBalanceDisplay(){
+            const u = users.find(x=>x.id===currentUserId);
+            balanceEl.textContent = u ? '$' + fmt(u.balance) : '--';
+        }
+        function log(msg){
+            const t = new Date().toLocaleTimeString();
+            logEl.innerHTML = `<div>[${t}] ${msg}</div>` + logEl.innerHTML;
+        }
+
+        // --- Board generation & game logic ---
+        function createBoard(size, mines){
+            const total = size*size;
+            const arr = new Array(total).fill(0).map((_,i)=>({index:i,mine:false,opened:false}));
+            // place mines
+            const indices = Array.from({length:total},(_,i)=>i);
+            for(let i=0;i<mines;i++){
+                const pick = Math.floor(Math.random()*indices.length);
+                const idx = indices.splice(pick,1)[0];
+                arr[idx].mine = true;
+            }
+            return arr;
+        }
+
+        function startRound(){
+            if(game.active) return;
+            const u = users.find(x=>x.id===currentUserId);
+            if(!u) return;
+            const bet = Number(betEl.value) || 0;
+            const gridSize = Number(gridSizeEl.value);
+            const mineCount = Number(mineCountEl.value);
+            if(bet <= 0){ alert('Set a positive bet'); return; }
+            if(bet > u.balance){ alert('Insufficient balance'); return; }
+            // lock bet
+            u.balance -= bet;
+            saveUsers(); updateBalanceDisplay();
+            game = {
+                active: true,
+                gridSize,
+                mineCount: Math.min(mineCount, gridSize*gridSize-1),
+                bet,
+                board: createBoard(gridSize, Math.min(mineCount, gridSize*gridSize-1)),
+                picked: 0,
+                potential: bet, // initial potential equals bet (multiplier grows)
+                lockedBet: bet
+            };
+            renderBoard();
+            updateHUD();
+            log(`${u.name} started a round with $${fmt(bet)} on ${gridSize}x${gridSize} (${game.mineCount} mines)`);
+            startBtn.disabled = true;
+            cashBtn.disabled = false;
+            roundStatusEl.textContent = 'In progress';
+        }
+
+        function tileClick(idx){
+            if(!game.active) return;
+            const cell = game.board[idx];
+            if(!cell || cell.opened) return;
+            cell.opened = true;
+            if(cell.mine){
+                // lose
+                revealAll(true);
+                endRoundLose();
+            } else {
+                game.picked++;
+                // increase potential: simple multiplier growth
+                // base multiplier: 1.0 + 0.25 * picked
+                game.potential = game.lockedBet * (1 + 0.25 * game.picked);
+                updateHUD();
+                renderBoard();
+                log(`Safe tile uncovered (#${game.picked}). Potential: $${fmt(game.potential)}`);
+            }
+        }
+
+        function cashOut(){
+            if(!game.active) return;
+            const u = users.find(x=>x.id===currentUserId);
+            if(!u) return;
+            const win = game.potential;
+            u.balance += win;
+            saveUsers();
+            log(`${u.name} cashed out $${fmt(win)} after picking ${game.picked} safe tiles.`);
+            endRoundWin();
+            updateBalanceDisplay();
+        }
+
+        function endRoundWin(){
+            // reveal board then reset
+            renderBoard(true);
+            resetRound();
+        }
+
+        function endRoundLose(){
+            const u = users.find(x=>x.id===currentUserId);
+            if(u) log(`${u.name} hit a mine and lost $${fmt(game.lockedBet)}.`);
+            renderBoard(true);
+            resetRound();
+        }
+
+        function revealAll(showLog){
+            if(!game.board.length) {
+                renderBoard(true);
+                return;
+            }
+            renderBoard(true);
+            if(showLog) log('All tiles revealed.');
+        }
+
+        function resetRound(){
+            game.active = false;
+            game.lockedBet = 0;
+            startBtn.disabled = false;
+            cashBtn.disabled = true;
+            roundStatusEl.textContent = 'Idle';
+            updateHUD();
+        }
+
+        // --- Rendering ---
+        function renderBoard(reveal=false){
+            const size = game.gridSize || 5;
+            gridEl.style.gridTemplateColumns = `repeat(${size}, auto)`;
+            gridEl.innerHTML = '';
+            const total = size*size;
+            for(let i=0;i<total;i++){
+                const cell = game.board[i] || {index:i,opened:false,mine:false};
+                const el = document.createElement('div');
+                el.className = 'tile' + (cell.opened || reveal ? ' open' : '');
+                if(cell.opened || reveal){
+                    if(cell.mine){
+                        el.classList.add('mine');
+                        el.textContent = '💣';
+                    } else {
+                        el.textContent = '✓';
+                    }
+                } else {
+                    el.textContent = '';
+                    el.addEventListener('click',()=>tileClick(i));
+                }
+                gridEl.appendChild(el);
+            }
+        }
+
+        function updateHUD(){
+            pickedCountEl.textContent = game.picked || 0;
+            payoutEl.textContent = '$' + fmt(game.potential || 0);
+        }
+
+        // --- User actions ---
+        addUserBtn.addEventListener('click',()=>{
+            const name = prompt('New user name:','Player' + (users.length+1));
+            if(!name) return;
+            const bal = parseFloat(prompt('Starting balance','100')) || 100;
+            const u = {id:idGen(), name:name.trim(), balance:Number(bal)};
+            users.push(u);
+            saveUsers();
+            currentUserId = u.id;
+            refreshUserList();
+            log(`User ${u.name} added with $${fmt(u.balance)}`);
+        });
+
+        resetUsersBtn.addEventListener('click',()=>{
+            if(!confirm('Reset all users and balances?')) return;
+            localStorage.removeItem(defaultUsersKey);
+            users = loadUsers();
+            currentUserId = users[0].id;
+            refreshUserList();
+            log('Users reset');
+        });
+
+        userSelect.addEventListener('change', ()=>{
+            currentUserId = userSelect.value;
+            updateBalanceDisplay();
+            // end any active round
+            if(game.active) {
+                if(confirm('Switching users will end the active round. Continue?')){
+                    revealAll();
+                    resetRound();
+                } else {
+                    // revert selection
+                    userSelect.value = currentUserId;
+                }
+            }
+        });
+
+        startBtn.addEventListener('click', startRound);
+        cashBtn.addEventListener('click', cashOut);
+        revealAllBtn.addEventListener('click', ()=>revealAll(true));
+        newBoardBtn.addEventListener('click', ()=>{ game.board=[]; renderBoard(true); });
+
+        // sync inputs
+        gridSizeEl.addEventListener('change', ()=>{ game.gridSize = Number(gridSizeEl.value); });
+        mineCountEl.addEventListener('change', ()=>{ game.mineCount = Number(mineCountEl.value); });
+
+        // --- Startup ---
+        refreshUserList();
+        renderBoard(true);
+        updateHUD();
+        log('UI ready');
+    </script>
+</body>
+</html>
