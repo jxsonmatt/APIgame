@@ -1,0 +1,12 @@
+cd "C:\Users\PA\Documents\APIgame"
+
+git status
+
+git add .
+
+git commit -m "changes made"
+
+git pull origin main --rebase
+
+git push origin main
+
