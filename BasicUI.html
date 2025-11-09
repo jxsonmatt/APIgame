@@ -126,7 +126,110 @@
         </main>
     </div>
 
-    <script>
+    
+        <script type="module">
+    // Firebase initialization
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+    import { getApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+    import {
+        getFirestore,
+        collection,
+        getDocs,
+        setDoc,
+        doc,
+        onSnapshot
+    } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-analytics.js";
+
+    // Your web app's Firebase configuration
+    const firebaseConfig = {
+  apiKey: "AIzaSyBQieeHbz8glgWcp8_BDdoNFGGnBjodbRk",
+  authDomain: "apigame-34134.firebaseapp.com",
+  projectId: "apigame-34134",
+  storageBucket: "apigame-34134.firebasestorage.app",
+  messagingSenderId: "648910176965",
+  appId: "1:648910176965:web:d93bf1f3348d9c3d60a6ac",
+  measurementId: "G-WYL7L5K6C7"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+
+    (async () => {
+        let app;
+        try { app = getApp(); }
+        catch (err) {
+            console.warn('Firebase app not found. Initialize Firebase before this script.');
+            return;
+        }
+        const db = getFirestore(app);
+        const colRef = collection(db, 'mg_users');
+
+        // preserve original saveUsers/local behavior
+        const originalSaveUsers = window.saveUsers || (() => {});
+        // never overwrite user's log/refresh functions, but use them
+        const uiLog = window.log || ((m)=>console.log(m));
+        const uiRefresh = window.refreshUserList || (()=>{});
+
+        async function pushUsersToFirestore(){
+            if(!Array.isArray(window.users)) return;
+            try{
+                await Promise.all(window.users.map(u=>{
+                    const d = Object.assign({}, u);
+                    return setDoc(doc(colRef, d.id), d);
+                }));
+                uiLog('Pushed local users to Firestore.');
+            }catch(e){ console.error('pushUsersToFirestore', e); uiLog('Failed pushing users to Firestore'); }
+        }
+
+        async function fetchAndMergeUsers(){
+            try{
+                const snap = await getDocs(colRef);
+                if(snap.empty){
+                    // nothing in firestore yet -> push local users
+                    await pushUsersToFirestore();
+                    return;
+                }
+                const remote = snap.docs.map(d=>d.data());
+                // if local storage has different data, replace it with remote
+                window.users = remote;
+                // persist locally using original function
+                originalSaveUsers();
+                // pick current user if unset
+                if(!window.currentUserId && window.users.length) window.currentUserId = window.users[0].id;
+                uiRefresh();
+                uiLog('Loaded users from Firestore.');
+            }catch(e){ console.error('fetchAndMergeUsers', e); uiLog('Failed loading users from Firestore'); }
+        }
+
+        // override saveUsers so UI actions also sync to Firestore
+        window.saveUsers = async function(){
+            try{
+                originalSaveUsers();
+            }catch(e){ console.warn('originalSaveUsers failed', e); }
+            try{
+                await pushUsersToFirestore();
+            }catch(e){ /* already logged */ }
+        };
+
+        // realtime listener -> update local users when remote changes
+        onSnapshot(colRef, snapshot => {
+            const remote = snapshot.docs.map(d=>d.data());
+            // simple sync: replace local users with remote and persist locally
+            window.users = remote;
+            try{ originalSaveUsers(); } catch(e){}
+            try{ uiRefresh(); } catch(e){}
+            uiLog('Realtime: users updated from Firestore.');
+        }, err => {
+            console.error('onSnapshot users error', err);
+            uiLog('Realtime listener error for Firestore users.');
+        });
+
+        // initial fetch/merge
+        await fetchAndMergeUsers();
+    })();
+
         // Basic client-side UI for a minefield gamble prototype.
         // Users stored in localStorage as "mg_users".
         const defaultUsersKey = 'mg_users_v1';
