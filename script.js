@@ -306,6 +306,22 @@ function updateHUD(){
 }
 
 // --- User actions ---
+$('tryBanana').addEventListener('click', () => {
+    log('Starting Banana Challenge...');
+    showBananaChallenge().then(success => {
+        const u = users.find(x=>x.id===currentUserId);
+        if(!u) return;
+        if(success) {
+            u.balance += 100;
+            saveUsers();
+            updateBalanceDisplay();
+            log(`${u.name} solved the Banana Challenge and earned $100!`);
+        } else {
+            log('Challenge failed. Try again!');
+        }
+    });
+});
+
 addUserBtn.addEventListener('click',()=>{
     const name = prompt('New user name:','Player' + (users.length+1));
     if(!name) return;
