@@ -190,45 +190,112 @@ function endRoundWin(){
 
 // Banana API Challenge integration
 async function showBananaChallenge() {
-    try {
-        const response = await fetch('https://marcconrad.com/uob/banana/api.php');
-        const data = await response.json();
-        
-        const modal = $('bananaModal');
-        const img = $('bananaImage');
-        const answer = $('bananaAnswer');
-        
-        img.src = data.url;
+    const modal = $('bananaModal');
+    const img = $('bananaImage');
+    const answer = $('bananaAnswer');
+
+    // Build API URL using current page protocol to avoid mixed-content issues
+    const proto = (location && location.protocol === 'https:') ? 'https:' : 'http:';
+    const apiBase = `${proto}//marcconrad.com/uob/banana/api.php`;
+
+    // Helper to open modal with given image src and solution
+    function openModal(imageSrc, solution) {
+        img.onerror = null; // reset
+        img.src = imageSrc;
         answer.value = '';
-        modal.dataset.answer = data.solution;
+        modal.dataset.answer = String(solution);
         modal.classList.add('show');
-        
+        answer.focus();
+
         return new Promise((resolve) => {
             const submit = $('submitBanana');
             const skip = $('skipBanana');
-            
+
             function cleanup() {
                 submit.removeEventListener('click', handleSubmit);
                 skip.removeEventListener('click', handleSkip);
+                answer.removeEventListener('keyup', handleKeyUp);
                 modal.classList.remove('show');
             }
-            
+
             function handleSubmit() {
-                const correct = Number(answer.value) === Number(modal.dataset.answer);
+                const userAnswer = Number(answer.value);
+                if (isNaN(userAnswer)) {
+                    alert('Please enter a valid number');
+                    return;
+                }
+                const correct = userAnswer === Number(modal.dataset.answer);
                 cleanup();
                 resolve(correct);
             }
-            
+
             function handleSkip() {
                 cleanup();
                 resolve(false);
             }
-            
+
+            function handleKeyUp(e) {
+                if (e.key === 'Enter') handleSubmit();
+                if (e.key === 'Escape') handleSkip();
+            }
+
             submit.addEventListener('click', handleSubmit);
             skip.addEventListener('click', handleSkip);
+            answer.addEventListener('keyup', handleKeyUp);
+
+            // If the image fails to load, try fallback or resolve false
+            img.onerror = () => {
+                log('Challenge image failed to load. Trying fallback...');
+                cleanup();
+                resolve(false);
+            };
         });
-    } catch(e) {
-        console.error('Banana API error:', e);
+    }
+
+    try {
+        // Try base64 endpoint first (returns image data as base64)
+        const resp = await fetch(`${apiBase}?out=json&base64=yes`);
+        if (!resp.ok) throw new Error('Network response not ok');
+        const data = await resp.json();
+
+        // API may return different field names depending on options
+        // prefer data.image (base64) or data.question (data URI or URL)
+        let imageSrc = null;
+        if (data.image) {
+            imageSrc = `data:image/png;base64,${data.image}`;
+        } else if (data.question) {
+            imageSrc = data.question;
+        }
+        const solution = data.solution ?? data[1] ?? null;
+
+        if (imageSrc && solution != null) {
+            return await openModal(imageSrc, solution);
+        }
+
+        // If response is not in expected form, fall through to try non-base64
+        log('Unexpected Banana API response format, trying non-base64 endpoint');
+    } catch (err) {
+        // Could be CORS, mixed-content or other network error
+        console.warn('Base64 fetch failed:', err);
+    }
+
+    // Fallback: try JSON with URL to image (base64=no)
+    try {
+        const resp2 = await fetch(`${apiBase}?out=json&base64=no`);
+        if (!resp2.ok) throw new Error('Network response not ok (fallback)');
+        const data2 = await resp2.json();
+        const imageSrc = data2.question;
+        const solution = data2.solution ?? null;
+        if (imageSrc && solution != null) {
+            return await openModal(imageSrc, solution);
+        }
+        log('Banana API returned unexpected data on fallback.');
+        return false;
+    } catch (err) {
+        console.error('Banana API error (fallback):', err);
+        // If a mixed-content or CORS error happens, advise the user
+        log('Failed to load Banana Challenge. Common causes: mixed HTTP/HTTPS or CORS restrictions.');
+        log('If you are opening the file via file:// or https, try serving the site over http (python -m http.server) or use a server-side proxy.');
         return false;
     }
 }
@@ -306,20 +373,58 @@ function updateHUD(){
 }
 
 // --- User actions ---
-$('tryBanana').addEventListener('click', () => {
-    log('Starting Banana Challenge...');
-    showBananaChallenge().then(success => {
-        const u = users.find(x=>x.id===currentUserId);
-        if(!u) return;
-        if(success) {
-            u.balance += 100;
-            saveUsers();
-            updateBalanceDisplay();
-            log(`${u.name} solved the Banana Challenge and earned $100!`);
-        } else {
-            log('Challenge failed. Try again!');
-        }
-    });
+// Banana Challenge simple handlers (from user snippet), integrated with user state
+let bananaSolution = null;
+
+$('tryBanana').addEventListener('click', async () => {
+    const modal = $('bananaModal');
+    modal.classList.add('show');
+
+    try {
+        // protocol-aware API URL to reduce mixed-content issues
+        const proto = (location && location.protocol === 'https:') ? 'https:' : 'http:';
+        const apiUrl = `${proto}//marcconrad.com/uob/banana/api.php?out=json`;
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+
+        const imgEl = $('bananaImage');
+        // API may return question (URL) or image (base64) depending on parameters
+        if (data.question) imgEl.src = data.question;
+        else if (data.image) imgEl.src = `data:image/png;base64,${data.image}`;
+        else imgEl.src = '';
+
+        bananaSolution = String(data.solution ?? data[1] ?? '');
+
+        log('Starting Banana Challenge...');
+    } catch (error) {
+        log('Failed to load Banana Challenge. Common causes: mixed HTTP/HTTPS or CORS restrictions.');
+        console.error('Banana API error:', error);
+    }
+});
+
+// Submit handler
+$('submitBanana').addEventListener('click', () => {
+    const userAnswer = $('bananaAnswer').value.trim();
+    const modal = $('bananaModal');
+    const u = users.find(x=>x.id===currentUserId);
+    if (!u) return;
+
+    if (userAnswer === bananaSolution) {
+        log('Challenge solved! +$100 reward.');
+        // Update user balance and persist
+        u.balance = Number(u.balance || 0) + 100;
+        saveUsers();
+        updateBalanceDisplay();
+        modal.classList.remove('show');
+    } else {
+        log('Challenge failed. Try again!');
+    }
+});
+
+// Skip handler
+$('skipBanana').addEventListener('click', () => {
+    $('bananaModal').classList.remove('show');
+    log('Banana Challenge skipped.');
 });
 
 addUserBtn.addEventListener('click',()=>{
