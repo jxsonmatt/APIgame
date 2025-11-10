@@ -1,0 +1,427 @@
+// Firebase SDK Imports
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import { 
+    getAuth, 
+    onAuthStateChanged,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    signOut,
+    updateProfile
+} from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+import {
+    getFirestore,
+    collection,
+    getDocs,
+    setDoc,
+    doc,
+    getDoc,
+    onSnapshot
+} from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+// Firebase Configuration
+const firebaseConfig = {
+    apiKey: "AIzaSyBQieeHbz8glgWcp8_BDdoNFGGnBjodbRk",
+    authDomain: "apigame-34134.firebaseapp.com",
+    projectId: "apigame-34134",
+    storageBucket: "apigame-34134.firebasestorage.app",
+    messagingSenderId: "648910176965",
+    appId: "1:648910176965:web:d93bf1f3348d9c3d60a6ac",
+    measurementId: "G-WYL7L5K6C7"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// --- Helpers ---
+const $ = id => document.getElementById(id);
+const fmt = v => Number(v).toFixed(2);
+
+// --- Game State ---
+let game = {
+    active: false,
+    gridSize: 5,
+    mineCount: 5,
+    bet: 0,
+    board: [],
+    picked: 0,
+    potential: 0,
+    lockedBet: 0
+};
+
+// Current user data
+let currentUser = null;
+let userBalance = 100;
+
+// --- UI References ---
+const balanceEl = $('balance');
+const gridEl = $('grid');
+const gridSizeEl = $('gridSize');
+const mineCountEl = $('mineCount');
+const betEl = $('betAmount');
+const startBtn = $('startRound');
+const cashBtn = $('cashOut');
+const pickedCountEl = $('pickedCount');
+const payoutEl = $('payout');
+const roundStatusEl = $('roundStatus');
+const logEl = $('log');
+const revealAllBtn = $('revealAll');
+const newBoardBtn = $('newBoard');
+
+// --- Auth UI Elements ---
+const authModal = $('authModal');
+const signInForm = $('signInForm');
+const signUpForm = $('signUpForm');
+const showSignUpBtn = $('showSignUp');
+const showSignInBtn = $('showSignIn');
+const authError = $('authError');
+const userInfo = $('userInfo');
+const currentUsername = $('currentUsername');
+const signOutBtn = $('signOut');
+
+// --- UI Functions ---
+function log(msg) {
+    const t = new Date().toLocaleTimeString();
+    logEl.innerHTML = `<div>[${t}] ${msg}</div>${logEl.innerHTML}`;
+}
+
+function showAuthError(message) {
+    authError.textContent = message;
+    authError.style.display = 'block';
+}
+
+function clearAuthError() {
+    authError.textContent = '';
+    authError.style.display = 'none';
+}
+
+async function updateBalanceDisplay() {
+    if (!auth.currentUser) {
+        balanceEl.textContent = '--';
+        return;
+    }
+    
+    try {
+        const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+        if (userDoc.exists()) {
+            userBalance = userDoc.data().balance;
+            balanceEl.textContent = '$' + fmt(userBalance);
+        } else {
+            userBalance = 100;
+            await setDoc(doc(db, 'users', auth.currentUser.uid), {
+                balance: userBalance,
+                username: auth.currentUser.displayName || 'Player',
+                email: auth.currentUser.email,
+                created: new Date().toISOString()
+            });
+            balanceEl.textContent = '$' + fmt(userBalance);
+        }
+    } catch (error) {
+        console.error('Error updating balance:', error);
+        balanceEl.textContent = 'Error';
+    }
+}
+
+// --- Game Functions ---
+function createBoard(size, mines) {
+    const total = size * size;
+    const arr = new Array(total).fill(0).map((_, i) => ({
+        index: i,
+        mine: false,
+        opened: false
+    }));
+    
+    const indices = Array.from({length: total}, (_, i) => i);
+    for (let i = 0; i < mines; i++) {
+        const pick = Math.floor(Math.random() * indices.length);
+        const idx = indices.splice(pick, 1)[0];
+        arr[idx].mine = true;
+    }
+    return arr;
+}
+
+async function startRound() {
+    if (game.active || !auth.currentUser) return;
+    
+    const bet = Number(betEl.value) || 0;
+    const gridSize = Number(gridSizeEl.value);
+    const mineCount = Number(mineCountEl.value);
+    
+    if (bet <= 0) {
+        alert('Set a positive bet');
+        return;
+    }
+    
+    // Check balance
+    const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+    if (!userDoc.exists()) return;
+    
+    const balance = userDoc.data().balance;
+    if (bet > balance) {
+        alert('Insufficient balance');
+        return;
+    }
+    
+    // Update balance in Firestore
+    await setDoc(doc(db, 'users', auth.currentUser.uid), {
+        balance: balance - bet,
+        lastGame: new Date().toISOString()
+    }, { merge: true });
+    
+    // Update game state
+    game = {
+        active: true,
+        gridSize,
+        mineCount: Math.min(mineCount, gridSize * gridSize - 1),
+        bet,
+        board: createBoard(gridSize, Math.min(mineCount, gridSize * gridSize - 1)),
+        picked: 0,
+        potential: bet,
+        lockedBet: bet
+    };
+    
+    renderBoard();
+    updateHUD();
+    await updateBalanceDisplay();
+    
+    log(`Started a round with $${fmt(bet)} on ${gridSize}x${gridSize} (${game.mineCount} mines)`);
+    startBtn.disabled = true;
+    cashBtn.disabled = false;
+    roundStatusEl.textContent = 'In progress';
+}
+
+async function tileClick(idx) {
+    if (!game.active || !auth.currentUser) return;
+    
+    const cell = game.board[idx];
+    if (!cell || cell.opened) return;
+    
+    cell.opened = true;
+    if (cell.mine) {
+        revealAll(true);
+        await endRoundLose();
+    } else {
+        game.picked++;
+        game.potential = game.lockedBet * (1 + 0.25 * game.picked);
+        updateHUD();
+        renderBoard();
+        log(`Safe tile uncovered (#${game.picked}). Potential: $${fmt(game.potential)}`);
+    }
+}
+
+async function cashOut() {
+    if (!game.active || !auth.currentUser) return;
+    
+    const win = game.potential;
+    
+    // Update balance in Firestore
+    const userRef = doc(db, 'users', auth.currentUser.uid);
+    const userDoc = await getDoc(userRef);
+    if (!userDoc.exists()) return;
+    
+    const newBalance = userDoc.data().balance + win;
+    await setDoc(userRef, {
+        balance: newBalance,
+        lastWin: win,
+        lastWinTime: new Date().toISOString()
+    }, { merge: true });
+    
+    log(`Cashed out $${fmt(win)} after picking ${game.picked} safe tiles.`);
+    endRoundWin();
+    await updateBalanceDisplay();
+}
+
+function endRoundWin() {
+    renderBoard(true);
+    resetRound();
+}
+
+async function endRoundLose() {
+    if (!auth.currentUser) return;
+    
+    log(`Hit a mine and lost $${fmt(game.lockedBet)}.`);
+    renderBoard(true);
+    resetRound();
+    
+    // Check balance
+    const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+    if (!userDoc.exists()) return;
+    
+    if (userDoc.data().balance <= 0) {
+        log('Out of money! Time for a Banana Challenge!');
+        const success = await showBananaChallenge();
+        if (success) {
+            // Award $100 for solving the challenge
+            await setDoc(doc(db, 'users', auth.currentUser.uid), {
+                balance: 100,
+                lastReward: new Date().toISOString()
+            }, { merge: true });
+            await updateBalanceDisplay();
+            log('Solved the Banana Challenge and earned $100!');
+        } else {
+            log('Better luck next time! Try another challenge.');
+        }
+    }
+}
+
+function revealAll(showLog) {
+    renderBoard(true);
+    if (showLog) log('All tiles revealed.');
+}
+
+function resetRound() {
+    game.active = false;
+    game.lockedBet = 0;
+    startBtn.disabled = false;
+    cashBtn.disabled = true;
+    roundStatusEl.textContent = 'Idle';
+    updateHUD();
+}
+
+// --- Rendering ---
+function renderBoard(reveal = false) {
+    const size = game.gridSize || 5;
+    gridEl.style.gridTemplateColumns = `repeat(${size}, auto)`;
+    gridEl.innerHTML = '';
+    
+    const total = size * size;
+    for (let i = 0; i < total; i++) {
+        const cell = game.board[i] || {index: i, opened: false, mine: false};
+        const el = document.createElement('div');
+        el.className = 'tile' + (cell.opened || reveal ? ' open' : '');
+        
+        if (cell.opened || reveal) {
+            if (cell.mine) {
+                el.classList.add('mine');
+                el.textContent = '💣';
+            } else {
+                el.textContent = '✓';
+            }
+        } else {
+            el.textContent = '';
+            el.addEventListener('click', () => tileClick(i));
+        }
+        
+        gridEl.appendChild(el);
+    }
+}
+
+function updateHUD() {
+    pickedCountEl.textContent = game.picked || 0;
+    payoutEl.textContent = '$' + fmt(game.potential || 0);
+}
+
+// --- Auth Event Handlers ---
+signInForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearAuthError();
+
+    const email = $('signInEmail').value;
+    const password = $('signInPassword').value;
+
+    try {
+        await signInWithEmailAndPassword(auth, email, password);
+        authModal.style.display = 'none';
+        signInForm.reset();
+    } catch (error) {
+        showAuthError('Sign in failed: ' + error.message);
+    }
+});
+
+signUpForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearAuthError();
+
+    const email = $('signUpEmail').value;
+    const password = $('signUpPassword').value;
+    const username = $('signUpUsername').value;
+
+    try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        await updateProfile(userCredential.user, { displayName: username });
+        
+        await setDoc(doc(db, 'users', userCredential.user.uid), {
+            username,
+            email,
+            balance: 100,
+            created: new Date().toISOString()
+        });
+
+        authModal.style.display = 'none';
+        signUpForm.reset();
+    } catch (error) {
+        showAuthError('Sign up failed: ' + error.message);
+    }
+});
+
+signOutBtn.addEventListener('click', async () => {
+    try {
+        await signOut(auth);
+        log('Signed out successfully');
+    } catch (error) {
+        log('Sign out failed: ' + error.message);
+    }
+});
+
+// Toggle between sign in and sign up forms
+function toggleAuthForms() {
+    signInForm.style.display = signInForm.style.display === 'none' ? 'block' : 'none';
+    signUpForm.style.display = signUpForm.style.display === 'none' ? 'block' : 'none';
+    clearAuthError();
+}
+
+showSignUpBtn.addEventListener('click', toggleAuthForms);
+showSignInBtn.addEventListener('click', toggleAuthForms);
+
+// --- Event Listeners ---
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize game board
+    game.board = createBoard(game.gridSize, 0);
+    renderBoard(true);
+    updateHUD();
+
+    // Set up auth state monitoring
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            authModal.style.display = 'none';
+            currentUsername.textContent = user.displayName || user.email;
+            userInfo.style.display = 'flex';
+            log(`Signed in as ${user.displayName || user.email}`);
+            await updateBalanceDisplay();
+        } else {
+            authModal.style.display = 'block';
+            currentUsername.textContent = '';
+            userInfo.style.display = 'none';
+            balanceEl.textContent = '--';
+        }
+    });
+});
+
+// Game action listeners
+startBtn.addEventListener('click', startRound);
+cashBtn.addEventListener('click', cashOut);
+revealAllBtn.addEventListener('click', () => revealAll(true));
+newBoardBtn.addEventListener('click', () => {
+    game.board = [];
+    renderBoard(true);
+});
+
+// Grid size and mine count handlers
+gridSizeEl.addEventListener('change', () => {
+    const newSize = Number(gridSizeEl.value);
+    game.gridSize = newSize;
+    
+    const maxMines = Math.max(1, newSize * newSize - 1);
+    mineCountEl.max = String(maxMines);
+    if (Number(mineCountEl.value) > maxMines) {
+        mineCountEl.value = String(maxMines);
+    }
+});
+
+mineCountEl.addEventListener('change', () => {
+    const val = Number(mineCountEl.value) || 1;
+    const maxMines = Math.max(1, (Number(gridSizeEl.value) || game.gridSize) ** 2 - 1);
+    game.mineCount = Math.min(Math.max(1, val), maxMines);
+    mineCountEl.value = String(game.mineCount);
+});

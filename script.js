@@ -1,6 +1,13 @@
-// Firebase initialization
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-import { getApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+// Firebase SDK Imports (version 9.x)
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import { 
+    getAuth, 
+    onAuthStateChanged,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    signOut,
+    updateProfile
+} from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
 import {
     getFirestore,
     collection,
@@ -8,19 +15,34 @@ import {
     setDoc,
     doc,
     onSnapshot
-} from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
-import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-analytics.js";
+} from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
-// Your web app's Firebase configuration
+// Firebase Configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyBQieeHbz8glgWcp8_BDdoNFGGnBjodbRk",
-  authDomain: "apigame-34134.firebaseapp.com",
-  projectId: "apigame-34134",
-  storageBucket: "apigame-34134.firebasestorage.app",
-  messagingSenderId: "648910176965",
-  appId: "1:648910176965:web:d93bf1f3348d9c3d60a6ac",
-  measurementId: "G-WYL7L5K6C7"
+    apiKey: "AIzaSyBQieeHbz8glgWcp8_BDdoNFGGnBjodbRk",
+    authDomain: "apigame-34134.firebaseapp.com",
+    projectId: "apigame-34134",
+    storageBucket: "apigame-34134.firebasestorage.app",
+    messagingSenderId: "648910176965",
+    appId: "1:648910176965:web:d93bf1f3348d9c3d60a6ac",
+    measurementId: "G-WYL7L5K6C7"
 };
+
+// Initialize Firebase
+let app;
+try {
+    app = initializeApp(firebaseConfig);
+} catch (error) {
+    console.error("Firebase initialization error:", error);
+    uiLog("Firebase initialization failed. Check console for details.");
+}
+
+// Initialize Firebase services
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// Reference to users collection
+const usersCollection = collection(db, 'users');
 
 // Firebase initialization and Firestore sync will be initialized after UI helpers are defined below.
 
@@ -33,8 +55,6 @@ const $ = id => document.getElementById(id);
 const fmt = v => Number(v).toFixed(2);
 
 // --- State ---
-let users = loadUsers();
-let currentUserId = users.length ? users[0].id : null;
 let game = {
     active: false,
     gridSize: 5,
@@ -46,10 +66,11 @@ let game = {
     lockedBet: 0
 };
 
+// Current user data
+let currentUser = null;
+let userBalance = 100; // Default starting balance
+
 // --- Init UI refs ---
-const userSelect = $('userSelect');
-const addUserBtn = $('addUser');
-const resetUsersBtn = $('resetUsers');
 const balanceEl = $('balance');
 const gridEl = $('grid');
 const gridSizeEl = $('gridSize');
@@ -97,9 +118,32 @@ function refreshUserList(){
     userSelect.value = currentUserId;
     updateBalanceDisplay();
 }
-function updateBalanceDisplay(){
-    const u = users.find(x=>x.id===currentUserId);
-    balanceEl.textContent = u ? '$' + fmt(u.balance) : '--';
+function updateBalanceDisplay() {
+    if (!auth.currentUser) {
+        balanceEl.textContent = '--';
+        return;
+    }
+    
+    try {
+        // Get balance from local storage with fallback to default
+        let storedBalance = localStorage.getItem(`balance_${auth.currentUser.uid}`);
+        
+        // If no balance exists, initialize it
+        if (storedBalance === null) {
+            storedBalance = '100';
+            localStorage.setItem(`balance_${auth.currentUser.uid}`, storedBalance);
+        }
+        
+        // Convert to number and format
+        userBalance = Number(storedBalance);
+        balanceEl.textContent = '$' + fmt(userBalance);
+        
+        // Log balance update for debugging
+        console.log(`Balance updated for ${auth.currentUser.displayName || auth.currentUser.email}: $${userBalance}`);
+    } catch (error) {
+        console.error('Error updating balance display:', error);
+        balanceEl.textContent = 'Error';
+    }
 }
 function log(msg){
     const t = new Date().toLocaleTimeString();
@@ -121,17 +165,40 @@ function createBoard(size, mines){
 }
 
 function startRound(){
-    if(game.active) return;
-    const u = users.find(x=>x.id===currentUserId);
-    if(!u) return;
+    if(game.active || !auth.currentUser) return false;
+    
     const bet = Number(betEl.value) || 0;
     const gridSize = Number(gridSizeEl.value);
     const mineCount = Number(mineCountEl.value);
-    if(bet <= 0){ alert('Set a positive bet'); return; }
-    if(bet > u.balance){ alert('Insufficient balance'); return; }
-    // lock bet
-    u.balance -= bet;
-    saveUsers(); updateBalanceDisplay();
+    
+    if(bet <= 0){ 
+        alert('Set a positive bet'); 
+        return false; 
+    }
+
+    // Check current balance from local storage
+    const balance = Number(localStorage.getItem(`balance_${auth.currentUser.uid}`)) || 0;
+    if(bet > balance){ 
+        // Only show Banana Challenge prompt if balance is 0 and round is idle
+        if (balance === 0 && roundStatusEl.textContent === 'Idle') {
+            const playChallenge = confirm('💰 You\'re out of money! Want to try the Banana Challenge to earn $100?');
+            if (playChallenge) {
+                log('🍌 Starting Banana Challenge to earn more funds...');
+                showBananaChallenge().then(success => {
+                    if (success) {
+                        // Retry the round after successful challenge
+                        startRound();
+                    }
+                });
+            }
+        } else {
+            alert('Insufficient balance for this bet');
+        }
+        return false;
+    }
+    // lock bet by updating local storage
+    localStorage.setItem(`balance_${auth.currentUser.uid}`, balance - bet);
+    updateBalanceDisplay();
     game = {
         active: true,
         gridSize,
@@ -144,7 +211,8 @@ function startRound(){
     };
     renderBoard();
     updateHUD();
-    log(`${u.name} started a round with $${fmt(bet)} on ${gridSize}x${gridSize} (${game.mineCount} mines)`);
+    startBtn.classList.remove('button-loading');
+    log(`${auth.currentUser.displayName || 'Player'} started a round with $${fmt(bet)} on ${gridSize}x${gridSize} (${game.mineCount} mines)`);
     startBtn.disabled = true;
     cashBtn.disabled = false;
     roundStatusEl.textContent = 'In progress';
@@ -171,13 +239,11 @@ function tileClick(idx){
 }
 
 function cashOut(){
-    if(!game.active) return;
-    const u = users.find(x=>x.id===currentUserId);
-    if(!u) return;
+    if(!game.active || !auth.currentUser) return;
     const win = game.potential;
-    u.balance += win;
-    saveUsers();
-    log(`${u.name} cashed out $${fmt(win)} after picking ${game.picked} safe tiles.`);
+    const currentBalance = Number(localStorage.getItem(`balance_${auth.currentUser.uid}`)) || 0;
+    localStorage.setItem(`balance_${auth.currentUser.uid}`, currentBalance + win);
+    log(`${auth.currentUser.displayName || 'Player'} cashed out $${fmt(win)} after picking ${game.picked} safe tiles.`);
     endRoundWin();
     updateBalanceDisplay();
 }
@@ -301,27 +367,14 @@ async function showBananaChallenge() {
 }
 
 function endRoundLose(){
-    const u = users.find(x=>x.id===currentUserId);
-    if(!u) return;
+    if(!auth.currentUser) return;
     
-    log(`${u.name} hit a mine and lost $${fmt(game.lockedBet)}.`);
+    // Disable cash out button immediately
+    cashBtn.disabled = true;
+    
+    log(`${auth.currentUser.displayName || 'Player'} hit a mine and lost $${fmt(game.lockedBet)}.`);
     renderBoard(true);
     resetRound();
-    
-    // Check if user is out of money
-    if(u.balance <= 0) {
-        log('Out of money! Time for a Banana Challenge!');
-        showBananaChallenge().then(success => {
-            if(success) {
-                u.balance += 100;
-                saveUsers();
-                updateBalanceDisplay();
-                log(`${u.name} solved the Banana Challenge and earned $100!`);
-            } else {
-                log('Better luck next time! Add more funds or try another challenge.');
-            }
-        });
-    }
 }
 
 function revealAll(showLog){
@@ -416,7 +469,7 @@ document.getElementById("tryBanana").addEventListener("click", async () => {
 });
 
 // Event handler for when user submits their answer
-document.getElementById("submitBanana").addEventListener("click", () => {
+document.getElementById("submitBanana").addEventListener("click", async () => {
   // Get user's answer and remove any whitespace
   const userAnswer = document.getElementById("bananaAnswer").value.trim();
   
@@ -424,46 +477,69 @@ document.getElementById("submitBanana").addEventListener("click", () => {
   const modal = document.getElementById("bananaModal");
   const resultElement = document.getElementById("bananaResult");
   
-  // Find the current user in our users array
-  const u = users.find(x=>x.id===currentUserId);
-  // Safety check: if no user found, exit early
-  if (!u) return;
+  if (!auth.currentUser) return;
 
   // Convert both user's answer and stored solution to numbers
-  // This ensures consistent comparison (string "5" equals number 5)
   const userNum = Number(userAnswer);
   const solutionNum = Number(bananaSolution);
 
-  // Check if conversion was successful (!isNaN) and numbers match
   if (!isNaN(userNum) && !isNaN(solutionNum) && userNum === solutionNum) {
     // CORRECT ANSWER HANDLING
-    
-    // Visual feedback: Green success message
-    resultElement.style.color = '#4CAF50';  // Green color
-    resultElement.textContent = 'Correct! +$100 reward';
-    
-    // Log the success to game history
-    log('Challenge solved! +$100 reward.');
-    
-    // Update user's balance
-    u.balance = Number(u.balance || 0) + 100;  // Add $100 reward
-    saveUsers();  // Save to persistent storage
-    updateBalanceDisplay();  // Update UI to show new balance
-    
-    // Auto-close modal after showing success
-    setTimeout(() => {
-      modal.style.display = "none";  // Hide modal
-      resultElement.textContent = '';  // Clear result message
-    }, 1500);  // 1.5 second delay
+    try {
+      // Update local balance
+      const currentBalance = Number(localStorage.getItem(`balance_${auth.currentUser.uid}`) || 0);
+      localStorage.setItem(`balance_${auth.currentUser.uid}`, currentBalance + 100);
+
+      // Visual feedback: Green success message
+      resultElement.style.color = '#4CAF50';
+      resultElement.textContent = '🎉 Correct! You earned $100! 🎉';
+      
+      // Show success message in game log
+      log('🌟 Banana Challenge completed successfully! +$100 added to your balance.');
+      
+      // Update UI directly from local storage
+      updateBalanceDisplay();
+      
+      // Auto-close modal after showing success
+      setTimeout(() => {
+        modal.style.display = "none";
+        resultElement.textContent = '';
+      }, 2000);
+      
+      // Create success animation
+      const successMsg = document.createElement('div');
+      successMsg.textContent = '+$100';
+      successMsg.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #4CAF50;
+        font-size: 48px;
+        font-weight: bold;
+        animation: floatUp 2s ease-out forwards;
+        z-index: 1000;
+      `;
+      document.body.appendChild(successMsg);
+      setTimeout(() => successMsg.remove(), 2000);
+      
+    } catch (error) {
+      console.error('Error updating balance:', error);
+      log('Error processing reward. Please try again.');
+    }
   } else {
     // WRONG ANSWER HANDLING
+    // Visual feedback: Red error message with emoji
+    resultElement.style.color = '#f44336';
+    resultElement.textContent = '❌ Incorrect. Try again! ❌';
     
-    // Visual feedback: Red error message
-    resultElement.style.color = '#f44336';  // Red color
-    resultElement.textContent = 'Incorrect. Try again!';
+    // Shake the input field to indicate error
+    const answerInput = document.getElementById("bananaAnswer");
+    answerInput.classList.add('shake');
+    setTimeout(() => answerInput.classList.remove('shake'), 500);
     
-    // Log the failure to game history
-    log('Challenge failed. Try again!');
+    // Log the failure with encouraging message
+    log('❌ Challenge failed. Keep trying - you can do it!');
   }
 });
 
@@ -486,43 +562,16 @@ function updateBalance(amount) {
   updateBalanceDisplay();
 }
 
-addUserBtn.addEventListener('click',()=>{
-    const name = prompt('New user name:','Player' + (users.length+1));
-    if(!name) return;
-    const bal = parseFloat(prompt('Starting balance','100')) || 100;
-    const u = {id:idGen(), name:name.trim(), balance:Number(bal)};
-    users.push(u);
-    saveUsers();
-    currentUserId = u.id;
-    refreshUserList();
-    log(`User ${u.name} added with $${fmt(u.balance)}`);
-});
-
-resetUsersBtn.addEventListener('click',()=>{
-    if(!confirm('Reset all users and balances?')) return;
-    localStorage.removeItem(defaultUsersKey);
-    users = loadUsers();
-    currentUserId = users[0].id;
-    refreshUserList();
-    log('Users reset');
-});
-
-userSelect.addEventListener('change', ()=>{
-    currentUserId = userSelect.value;
-    updateBalanceDisplay();
-    // end any active round
-    if(game.active) {
-        if(confirm('Switching users will end the active round. Continue?')){
-            revealAll();
-            resetRound();
-        } else {
-            // revert selection
-            userSelect.value = currentUserId;
-        }
+// Event listeners for game actions only
+startBtn.addEventListener('click', (e) => {
+    const button = e.target;
+    button.classList.add('button-loading');
+    const result = startRound();
+    if (!result) {
+        button.classList.remove('button-loading');
     }
 });
 
-startBtn.addEventListener('click', startRound);
 cashBtn.addEventListener('click', cashOut);
 revealAllBtn.addEventListener('click', ()=>revealAll(true));
 newBoardBtn.addEventListener('click', ()=>{ game.board=[]; renderBoard(true); });
@@ -545,92 +594,280 @@ mineCountEl.addEventListener('change', ()=>{
 });
 
 // --- Startup ---
-refreshUserList();
-// initialize an empty board (no mines) for the current grid size so UI shows a proper grid
-game.board = createBoard(game.gridSize, 0);
-renderBoard(true);
-updateHUD();
-log('UI ready');
+// Initialize game board immediately
+function initializeGame() {
+    game.board = createBoard(game.gridSize, 0);
+    renderBoard(true);
+    updateHUD();
+    log('Game board initialized');
+}
 
-// expose UI helper functions to window so external integrations (e.g., Firestore) can hook in
-window.refreshUserList = refreshUserList;
-window.log = log;
-window.saveUsers = saveUsers;
+// Initialize everything when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    initializeGame();
+    updateBalanceDisplay();
+    log('UI ready');
+});
 
-// Initialize Firebase and Firestore sync now that UI helpers exist
-(async () => {
-    let app;
-    try {
-        app = initializeApp(firebaseConfig);
-    } catch (err) {
-        console.warn('Failed to initialize Firebase:', err);
+// Utility function for UI logging with timestamps
+function uiLog(message) {
+    const timestamp = new Date().toLocaleTimeString();
+    const logElement = document.getElementById('log');
+    const logEntry = `[${timestamp}] ${message}`;
+    
+    if (logElement) {
+        // Add new message at the top
+        logElement.innerHTML = `<div>${logEntry}</div>${logElement.innerHTML}`;
+    }
+    // Also log to console for debugging
+    console.log(logEntry);
+}
+
+// Function to sync users to Firestore
+async function syncUsersToFirestore() {
+    if (!window.users || !Array.isArray(window.users)) {
+        uiLog('No users to sync');
         return;
     }
-    try { getAnalytics(app); } catch(e) { /* analytics optional */ }
 
-    const db = getFirestore(app);
-    const colRef = collection(db, 'mg_users');
+    try {
+        // Create a batch of promises to update all users
+        const updatePromises = window.users.map(user => {
+            const userDoc = doc(usersCollection, user.id);
+            return setDoc(userDoc, {
+                ...user,
+                lastUpdated: new Date().toISOString()
+            }, { merge: true });
+        });
+
+        // Wait for all updates to complete
+        await Promise.all(updatePromises);
+        uiLog('Successfully synced users to Firestore');
+    } catch (error) {
+        console.error('Error syncing users:', error);
+        uiLog('Failed to sync users to Firestore');
+    }
+}
+
+// Function to load users from Firestore
+async function loadUsersFromFirestore() {
+    try {
+        const snapshot = await getDocs(usersCollection);
+        if (snapshot.empty) {
+            uiLog('No users found in Firestore');
+            return;
+        }
+
+        // Update local users array
+        window.users = snapshot.docs.map(doc => doc.data());
+        refreshUserList();
+        uiLog('Successfully loaded users from Firestore');
+    } catch (error) {
+        console.error('Error loading users:', error);
+        uiLog('Failed to load users from Firestore');
+    }
+}
+
+// Set up real-time sync
+function setupRealtimeSync() {
+    return onSnapshot(usersCollection, (snapshot) => {
+        // Update local users array with changes
+        window.users = snapshot.docs.map(doc => doc.data());
+        refreshUserList();
+        uiLog('Real-time update received from Firestore');
+    }, (error) => {
+        console.error('Realtime sync error:', error);
+        uiLog('Real-time sync error occurred');
+    });
+}
+
+// Override the original saveUsers function to include Firestore sync
+const originalSaveUsers = window.saveUsers || (() => {});
+window.saveUsers = async function() {
+    // First call the original function
+    originalSaveUsers();
+    // Then sync to Firestore
+    await syncUsersToFirestore();
+};
+
+// Authentication state observer
+onAuthStateChanged(auth, async (user) => {
+    if (user) {
+        // User is signed in
+        uiLog(`Authenticated as ${user.uid}`);
+        
+        // Load initial data
+        await loadUsersFromFirestore();
+        
+        // Set up real-time sync
+        const unsubscribe = setupRealtimeSync();
+        
+        // Store unsubscribe function for cleanup
+        window.unsubscribeFirestore = unsubscribe;
+    } else {
+        // User is signed out
+        uiLog('No user authenticated. Signing in anonymously...');
+        try {
+            await signInAnonymously(auth);
+        } catch (error) {
+            console.error('Anonymous auth error:', error);
+            uiLog('Failed to sign in anonymously');
+        }
+    }
+});
 
     // preserve original saveUsers/local behavior
-    const originalSaveUsers = window.saveUsers || (() => {});
-    // never overwrite user's log/refresh functions, but use them
-    const uiLog = window.log || ((m)=>console.log(m));
-    const uiRefresh = window.refreshUserList || (()=>{});
+// Auth UI Elements
+const authModal = document.getElementById('authModal');
+const signInForm = document.getElementById('signInForm');
+const signUpForm = document.getElementById('signUpForm');
+const showSignUpBtn = document.getElementById('showSignUp');
+const showSignInBtn = document.getElementById('showSignIn');
+const authError = document.getElementById('authError');
+const userInfo = document.getElementById('userInfo');
+const currentUsername = document.getElementById('currentUsername');
+const signOutBtn = document.getElementById('signOut');
 
-    async function pushUsersToFirestore(){
-        if(!Array.isArray(window.users)) return;
-        try{
-            await Promise.all(window.users.map(u=>{
-                const d = Object.assign({}, u);
-                return setDoc(doc(colRef, d.id), d);
-            }));
-            uiLog('Pushed local users to Firestore.');
-        }catch(e){ console.error('pushUsersToFirestore', e); uiLog('Failed pushing users to Firestore'); }
+// Auth UI Functions
+function showAuthError(message) {
+    authError.textContent = message;
+    authError.style.display = 'block';
+}
+
+function clearAuthError() {
+    authError.textContent = '';
+    authError.style.display = 'none';
+}
+
+function toggleAuthForms() {
+    signInForm.style.display = signInForm.style.display === 'none' ? 'block' : 'none';
+    signUpForm.style.display = signUpForm.style.display === 'none' ? 'block' : 'none';
+    clearAuthError();
+}
+
+// Auth Event Handlers
+signInForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearAuthError();
+
+    const email = document.getElementById('signInEmail').value;
+    const password = document.getElementById('signInPassword').value;
+
+    try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        // Initialize balance if it doesn't exist
+        const currentBalance = localStorage.getItem(`balance_${userCredential.user.uid}`);
+        if (currentBalance === null) {
+            localStorage.setItem(`balance_${userCredential.user.uid}`, '100');
+        }
+        updateBalanceDisplay();
+        authModal.style.display = 'none';
+        signInForm.reset();
+    } catch (error) {
+        showAuthError('Sign in failed: ' + error.message);
+    }
+});
+
+signUpForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearAuthError();
+
+    const email = document.getElementById('signUpEmail').value;
+    const password = document.getElementById('signUpPassword').value;
+    const username = document.getElementById('signUpUsername').value;
+
+    try {
+        // Create user account
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        
+        // Update profile with username
+        await updateProfile(userCredential.user, {
+            displayName: username
+        });
+
+        // Create user document in Firestore
+        await setDoc(doc(db, 'users', userCredential.user.uid), {
+            username: username,
+            email: email,
+            balance: 100, // Initial balance
+            created: new Date().toISOString()
+        });
+
+        authModal.style.display = 'none';
+        signUpForm.reset();
+    } catch (error) {
+        showAuthError('Sign up failed: ' + error.message);
+    }
+});
+
+signOutBtn.addEventListener('click', async () => {
+    try {
+        await signOut(auth);
+        uiLog('Signed out successfully');
+    } catch (error) {
+        uiLog('Sign out failed: ' + error.message);
+    }
+});
+
+showSignUpBtn.addEventListener('click', toggleAuthForms);
+showSignInBtn.addEventListener('click', toggleAuthForms);
+
+// Initialize Firebase sync immediately
+(async function initializeFirebaseSync() {
+    // Expose helper functions to window
+    window.refreshUserList = refreshUserList;
+    window.log = log;
+    
+    // Show auth modal if not authenticated
+    if (!auth.currentUser) {
+        authModal.style.display = 'block';
     }
 
-    async function fetchAndMergeUsers(){
-        try{
-            const snap = await getDocs(colRef);
-            if(snap.empty){
-                // nothing in firestore yet -> push local users
-                await pushUsersToFirestore();
-                return;
+    // Set up auth state monitoring
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            // Update UI
+            authModal.style.display = 'none';
+            currentUsername.textContent = user.displayName || user.email;
+            userInfo.style.display = 'flex';
+            
+            // Initialize balance if it doesn't exist
+            const currentBalance = localStorage.getItem(`balance_${user.uid}`);
+            if (currentBalance === null) {
+                localStorage.setItem(`balance_${user.uid}`, '100');
             }
-            const remote = snap.docs.map(d=>d.data());
-            // if local storage has different data, replace it with remote
-            window.users = remote;
-            // persist locally using original function
-            try { originalSaveUsers(); } catch(e){}
-            // pick current user if unset
-            if(!window.currentUserId && window.users.length) window.currentUserId = window.users[0].id;
-            uiRefresh();
-            uiLog('Loaded users from Firestore.');
-        }catch(e){ console.error('fetchAndMergeUsers', e); uiLog('Failed loading users from Firestore'); }
-    }
-
-    // override window.saveUsers so UI actions also sync to Firestore
-    window.saveUsers = async function(){
-        try{
-            originalSaveUsers();
-        }catch(e){ console.warn('originalSaveUsers failed', e); }
-        try{
-            await pushUsersToFirestore();
-        }catch(e){ /* already logged */ }
-    };
-
-    // realtime listener -> update local users when remote changes
-    onSnapshot(colRef, snapshot => {
-        const remote = snapshot.docs.map(d=>d.data());
-        // simple sync: replace local users with remote and persist locally
-        window.users = remote;
-        try{ originalSaveUsers(); } catch(e){}
-        try{ uiRefresh(); } catch(e){}
-        uiLog('Realtime: users updated from Firestore.');
-    }, err => {
-        console.error('onSnapshot users error', err);
-        uiLog('Realtime listener error for Firestore users.');
+            
+            // Update balance display
+            updateBalanceDisplay();
+            
+            uiLog(`Signed in as ${user.displayName || user.email}`);
+            
+            // Initial data load
+            await loadUsersFromFirestore();
+            
+            // Set up real-time sync
+            const unsubscribe = setupRealtimeSync();
+            
+            // Store unsubscribe function
+            window.unsubscribeFirestore = unsubscribe;
+        } else {
+            // User is signed out
+            authModal.style.display = 'block';
+            currentUsername.textContent = '';
+            userInfo.style.display = 'none';
+            
+            // Clear any sensitive data
+            window.users = [];
+            refreshUserList();
+        }
     });
 
-    // initial fetch/merge
-    await fetchAndMergeUsers();
+    // Override saveUsers to include Firestore sync
+    const originalSaveUsers = window.saveUsers;
+    window.saveUsers = async function() {
+        if (typeof originalSaveUsers === 'function') {
+            originalSaveUsers();
+        }
+        await syncUsersToFirestore();
+    };
 })();

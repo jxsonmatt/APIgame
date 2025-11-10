@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minefield Gamble - Login</title>
+  <style>
+    /* Background */
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg, #0f1c49, #1a3e82);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    /* Container */
+    .login-container {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(15px);
+      border-radius: 18px;
+      padding: 40px 45px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+      width: 340px;
+      text-align: center;
+      color: #fff;
+    }
+
+    /* Title */
+    .login-container h1 {
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 30px;
+    }
+
+    /* Input fields */
+    .input-field {
+      width: 100%;
+      padding: 12px 15px;
+      margin-bottom: 18px;
+      border: none;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+      box-sizing: border-box;
+      transition: 0.3s;
+    }
+
+    .input-field:focus {
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    /* Checkbox and Forgot Password */
+    .options {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      margin-bottom: 25px;
+    }
+
+    .options label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+
+    .options a {
+      color: #9ecbff;
+      text-decoration: none;
+    }
+
+    .options a:hover {
+      text-decoration: underline;
+    }
+
+    /* Buttons */
+    .btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 600;
+      transition: 0.3s;
+    }
+
+    .login-btn {
+      background: linear-gradient(90deg, #2196f3, #00bcd4);
+      color: white;
+      margin-bottom: 12px;
+    }
+
+    .login-btn:hover {
+      background: linear-gradient(90deg, #00bcd4, #2196f3);
+    }
+
+    .create-btn {
+      background: rgba(255, 255, 255, 0.15);
+      color: #e0e0e0;
+    }
+
+    .create-btn:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <h1>Welcome to Minefield Gamble</h1>
+    
+    <input type="email" placeholder="Email ID" class="input-field">
+    <input type="password" placeholder="Password" class="input-field">
+
+    <div class="options">
+      <label><input type="checkbox"> Remember me</label>
+      <a href="#">Forgot Password?</a>
+    </div>
+
+    <button class="btn login-btn">LOGIN</button>
+    <button class="btn create-btn">Create New Account</button>
+  </div>
+</body>
+</html>

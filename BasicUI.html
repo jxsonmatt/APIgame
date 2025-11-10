@@ -5,23 +5,577 @@
     <title>Minefield Gamble — Basic UI</title>
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        /* Animations */
+        @keyframes floatUp {
+            0% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -200%) scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        .shake {
+            animation: shake 0.5s ease-in-out;
+        }
+
+        /* Auth Modal Styles */
+        .auth-modal {
+            background: #000C24;
+            backdrop-filter: blur(20px);
+            font-family: 'Poppins', sans-serif;
+        }
+
+        .auth-modal .modal-content {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(15px);
+            color: #fff;
+            border-radius: 18px;
+            padding: 40px 45px;
+            max-width: 340px;
+            width: 90%;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+
+        .auth-modal h2 {
+            color: #fff;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 22px;
+            font-weight: 600;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+            position: relative;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* Form Input Styling */
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            margin-bottom: 18px;
+            border: none;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+            font-size: 14px;
+            transition: 0.3s;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        .form-group input:focus {
+            background: rgba(255, 255, 255, 0.25);
+            outline: none;
+        }
+
+        .form-group input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        /* Input Icons */
+        .form-group::before {
+            content: '';
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            opacity: 0.6;
+            background-size: contain;
+            background-repeat: no-repeat;
+            z-index: 1;
+        }
+
+        .form-group.email::before {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='white' viewBox='0 0 24 24'%3E%3Cpath d='M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z'/%3E%3C/svg%3E");
+            left: 35px !important;
+        }
+
+        .form-group.password::before {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='white' viewBox='0 0 24 24'%3E%3Cpath d='M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z'/%3E%3C/svg%3E");
+        }
+
+        .form-group input::placeholder {
+            color: #666;
+        }
+
+        /* Button Styling */
+        .btn-row {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .btn-row button {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 16px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-row button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            transition: 0.3s;
+            margin-bottom: 12px;
+        }
+
+        .btn-row button.primary {
+            background: linear-gradient(90deg, #1a3e82, #0f1c49);
+            color: white;
+        }
+
+        .btn-row button.primary:hover {
+            background: linear-gradient(90deg, #0f1c49, #1a3e82);
+        }
+
+        .btn-row button:not(.primary) {
+            background: rgba(255, 255, 255, 0.08);
+            color: #e0e0e0;
+        }
+
+        .btn-row button:not(.primary):hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        .btn-row button.primary:hover {
+            background: linear-gradient(135deg, #805AD5, #6B46C1);
+            box-shadow: 0 6px 20px rgba(107, 70, 193, 0.4);
+        }
+
+        .btn-row button:not(.primary):hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Remember Me Checkbox */
+        .form-options {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            margin-bottom: 25px;
+        }
+
+        .remember-me {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            color: #fff;
+            font-size: 13px;
+        }
+
+        .forgot-password {
+            color: #9ecbff;
+            text-decoration: none;
+            font-size: 13px;
+            transition: 0.3s;
+        }
+
+        .forgot-password:hover {
+            text-decoration: underline;
+        }
+
+        /* Success Animation */
+        @keyframes checkmark {
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+            50% {
+                transform: scale(1.2);
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .success-checkmark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+            color: white;
+            font-size: 24px;
+        }
+
+        .success-checkmark.show {
+            display: block;
+            animation: checkmark 0.5s ease-in-out forwards;
+        }
+
+        /* Error Message Styling */
+        #authError {
+            background: linear-gradient(to right, #ff416c, #ff4b2b);
+            color: white;
+            padding: 16px;
+            border-radius: 12px;
+            margin-top: 15px;
+            font-size: 14px;
+            text-align: center;
+            display: none;
+            animation: slideIn 0.3s ease-out;
+            box-shadow: 0 4px 12px rgba(255, 75, 43, 0.2);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-10px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* Success Message */
+        .auth-success {
+            background: linear-gradient(to right, #43a047, #66bb6a);
+            color: white;
+            padding: 16px;
+            border-radius: 12px;
+            margin-top: 15px;
+            font-size: 14px;
+            text-align: center;
+            display: none;
+            animation: slideIn 0.3s ease-out;
+            box-shadow: 0 4px 12px rgba(67, 160, 71, 0.2);
+        }
+
+        /* User Info Display */
+        #userInfo {
+            background: #2d2d2d;
+            padding: 8px 15px;
+            border-radius: 25px;
+            display: inline-flex;
+            align-items: center;
+            gap: 15px;
+            margin: 10px;
+        }
+
+        #currentUsername {
+            color: #4CAF50;
+            font-weight: 500;
+        }
+
+        #signOut {
+            background: #333;
+            color: #fff;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        #signOut:hover {
+            background: #444;
+            transform: translateY(-1px);
+        }
+
+        /* Form Transitions and Effects */
+        #signInForm, #signUpForm {
+            transition: all 0.5s ease;
+            opacity: 1;
+            position: relative;
+        }
+
+        #signInForm.hidden, #signUpForm.hidden {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        /* Glassmorphism Effect */
+        .auth-modal::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at center, rgba(107, 70, 193, 0.2), transparent 60%),
+                        radial-gradient(circle at top right, rgba(255, 70, 131, 0.2), transparent 60%);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        /* Input Focus Effect */
+        .form-group input:focus + .focus-effect {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .focus-effect {
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(135deg, rgba(107, 70, 193, 0.2), rgba(255, 70, 131, 0.2));
+            border-radius: 18px;
+            opacity: 0;
+            transform: scale(0.95);
+            transition: all 0.3s ease;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        /* Animation for autofill */
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover,
+        input:-webkit-autofill:focus {
+            -webkit-text-fill-color: white;
+            -webkit-box-shadow: 0 0 0px 1000px rgba(255, 255, 255, 0.08) inset;
+            transition: background-color 5000s ease-in-out 0s;
+        }
+
+        /* Active Input Effect */
+        .form-group input:not(:placeholder-shown) {
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        /* Game Container and Layout */
+        .game-layout {
+            display: flex;
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            align-items: flex-start;
+        }
+
+        .game-container {
+            flex: 1;
+            min-width: 0; /* Prevents flex item from overflowing */
+        }
+
+        /* Vertical Action Buttons */
+        .vertical-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 200px;
+            position: sticky;
+            top: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            border-radius: 12px;
+        }
+
+        /* Game Buttons */
+        .game-button {
+            padding: 12px 24px !important;
+            font-size: 14px !important;
+            border-radius: 8px !important;
+            transition: all 0.3s ease !important;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 500;
+            background: #2d2d2d !important;
+            color: #fff !important;
+            border: 2px solid #3d3d3d !important;
+            white-space: nowrap;
+        }
+
+        .game-button:hover {
+            background: #3d3d3d !important;
+            border-color: #4d4d4d !important;
+            transform: translateY(-2px);
+        }
+
+        .game-button.primary {
+            background: #4CAF50 !important;
+            border-color: #45a049 !important;
+        }
+
+        .game-button.primary:hover {
+            background: #45a049 !important;
+            border-color: #388e3c !important;
+        }
+
+        .action-button {
+            width: 100%;
+            font-size: 16px !important;
+            padding: 15px 0 !important; /* Remove horizontal padding */
+            text-align: center;
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            min-height: 54px;
+        }
+
+        .action-button.highlight {
+            font-size: 18px !important;
+            font-weight: bold !important;
+            background: linear-gradient(45deg, #1976D2, #2196F3) !important;
+            border-color: #1976D2 !important;
+            color: white !important;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        /* Center emoji in challenge button */
+        #tryBanana {
+            gap: 8px;
+        }
+
+        .action-button.highlight:hover {
+            background: linear-gradient(45deg, #1565C0, #1976D2) !important;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+
+        #tryBanana {
+            background: linear-gradient(45deg, #FF9800, #FFB74D) !important;
+            border-color: #FF9800 !important;
+            color: #1a1a1a !important;
+            font-weight: bold !important;
+            opacity: 0.85;
+            transition: all 0.3s ease !important;
+        }
+
+        #tryBanana:hover {
+            opacity: 1;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(255, 152, 0, 0.2);
+        }
+
+        /* Loading States */
+        .button-loading {
+            position: relative;
+            cursor: wait !important;
+            opacity: 0.7;
+        }
+
+        .button-loading::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            top: 50%;
+            right: 10px;
+            margin-top: -8px;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            border-right-color: transparent;
+            animation: button-loading-spinner 0.75s linear infinite;
+        }
+
+        @keyframes button-loading-spinner {
+            from {
+                transform: rotate(0turn);
+            }
+            to {
+                transform: rotate(1turn);
+            }
+        }
+    </style>
 </head>
 <body>
+    <!-- Auth Modal -->
+    <div id="authModal" class="modal auth-modal">
+        <div class="modal-content">
+            <h2 id="authTitle">Welcome to Minefield Gamble</h2>
+            
+            <!-- Auth Forms -->
+            <div id="authForms">
+                <!-- Sign In Form -->
+                <form id="signInForm">
+                    <div class="form-group">
+                        <input type="email" id="signInEmail" required placeholder="Email ID">
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="signInPassword" required placeholder="Password">
+                    </div>
+                    <div class="form-options">
+                        <label class="remember-me">
+                            <input type="checkbox" id="rememberMe">
+                            <span>Remember me</span>
+                        </label>
+                        <a href="#" class="forgot-password">Forgot Password?</a>
+                    </div>
+                    <div class="btn-row">
+                        <button type="submit" class="primary">LOGIN</button>
+                        <button type="button" id="showSignUp">Create New Account</button>
+                    </div>
+                </form>
+
+                <!-- Sign Up Form (initially hidden) -->
+                <form id="signUpForm" style="display: none;">
+                    <div class="form-group">
+                        <label for="signUpUsername">Choose a Username</label>
+                        <input type="text" id="signUpUsername" required placeholder="Enter a username">
+                    </div>
+                    <div class="form-group">
+                        <label for="signUpEmail">Email Address</label>
+                        <input type="email" id="signUpEmail" required placeholder="Enter your email">
+                    </div>
+                    <div class="form-group">
+                        <label for="signUpPassword">Password</label>
+                        <input type="password" id="signUpPassword" required minlength="6" 
+                               placeholder="At least 6 characters">
+                    </div>
+                    <div class="btn-row">
+                        <button type="submit" class="primary">Create Account</button>
+                        <button type="button" id="showSignIn">Back to Sign In</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Auth Error Message -->
+            <p id="authError"></p>
+        </div>
+    </div>
+
     <div class="wrap">
         <header>
             <div>
                 <h1>Minefield Gamble — Basic UI</h1>
                 <div class="muted">Click squares to uncover. Mines lose the round. Cash out winnings while you can.</div>
             </div>
+            <!-- Add User Info Display -->
+            <div id="userInfo" style="text-align: right; margin-bottom: 10px;">
+                <span id="currentUsername"></span>
+                <button id="signOut" class="small">Sign Out</button>
+            </div>
 
             <div class="controls">
-                <div class="panel">
-                    <label for="userSelect">User</label>
-                    <select id="userSelect"></select>
-                    <button id="addUser" class="small">Add</button>
-                    <button id="resetUsers" class="small">Reset</button>
-                </div>
-
                 <div class="panel">
                     <div>
                         <div class="muted">Balance</div>
@@ -32,64 +586,58 @@
         </header>
 
         <main>
-            <div class="left">
-                <div class="board-wrap">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-                        <div style="display:flex;gap:8px;align-items:center">
-                            <label class="muted">Grid</label>
-                            <select id="gridSize">
-                                <option value="5">5 × 5</option>
-                                <option value="6">6 × 6</option>
-                                <option value="7">7 × 7</option>
-                            </select>
-                            <label class="muted">Mines</label>
-                            <input id="mineCount" type="number" min="1" max="20" value="5" style="width:72px">
+            <div class="game-layout">
+                <div class="game-container">
+                    <div class="board-wrap">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                            <div style="display:flex;gap:8px;align-items:center">
+                                <label class="muted">Grid</label>
+                                <select id="gridSize">
+                                    <option value="5">5 × 5</option>
+                                    <option value="6">6 × 6</option>
+                                    <option value="7">7 × 7</option>
+                                </select>
+                                <label class="muted">Mines</label>
+                                <input id="mineCount" type="number" min="1" max="20" value="5" style="width:72px">
+                            </div>
+
+                            <div style="display:flex;gap:8px;align-items:center">
+                                <label class="muted">Bet</label>
+                                <input id="betAmount" type="number" min="1" value="10" style="width:100px">
+                                <button id="startRound" class="primary game-button">Start Round</button>
+                                <button id="cashOut" class="game-button" disabled>Cash Out</button>
+                            </div>
                         </div>
 
-                        <div style="display:flex;gap:8px;align-items:center">
-                            <label class="muted">Bet</label>
-                            <input id="betAmount" type="number" min="1" value="10" style="width:100px">
-                            <button id="startRound" class="primary small">Start Round</button>
-                            <button id="cashOut" class="small" disabled>Cash Out</button>
+                        <div id="info" style="display:flex;gap:18px;margin-bottom:12px">
+                            <div>
+                                <div class="muted">Picked</div>
+                                <div id="pickedCount" class="big">0</div>
+                            </div>
+                            <div>
+                                <div class="muted">Potential Payout</div>
+                                <div id="payout" class="big">0</div>
+                            </div>
+                            <div>
+                                <div class="muted">Round</div>
+                                <div id="roundStatus" class="big">Idle</div>
+                            </div>
                         </div>
+
+                        <div id="grid" class="grid"></div>
                     </div>
-
-                    <div id="info" style="display:flex;gap:18px;margin-bottom:12px">
-                        <div>
-                            <div class="muted">Picked</div>
-                            <div id="pickedCount" class="big">0</div>
-                        </div>
-                        <div>
-                            <div class="muted">Potential Payout</div>
-                            <div id="payout" class="big">0</div>
-                        </div>
-                        <div>
-                            <div class="muted">Round</div>
-                            <div id="roundStatus" class="big">Idle</div>
-                        </div>
-                    </div>
-
-                    <div id="grid" class="grid"></div>
                 </div>
+
+                <!-- Vertical Action Buttons -->
+                <div class="vertical-actions">
+                    <button id="revealAll" class="game-button action-button">REVEAL ALL</button>
+                    <button id="newBoard" class="game-button action-button highlight">CLEAR BOARD</button>
+                    <button id="tryBanana" class="game-button action-button">🍌 PLAY CHALLENGE</button>
+                </div>
+
+                <!-- Hidden log for functionality -->
+                <div id="log" style="display:none"></div>
             </div>
-
-            <aside class="right">
-                <div class="panel" style="flex-direction:column;gap:10px;">
-                    <div>
-                        <div class="muted">Round Log</div>
-                        <div id="log" style="height:260px;overflow:auto;font-size:13px;color:var(--muted);"></div>
-                    </div>
-
-                    <div style="display:flex;flex-direction:column;gap:8px">
-                        <button id="revealAll" class="small">Reveal All</button>
-                        <button id="newBoard" class="small">Clear Board</button>
-                        <button id="tryBanana" class="primary small">Try Banana Challenge ($100 Reward)</button>
-                    </div>
-                </div>
-                <footer>
-                    Prototype UI — client only. Balances stored locally.
-                </footer>
-            </aside>
         </main>
     </div>
 
@@ -128,7 +676,32 @@
         </div>
     </div>
 
-    <script type="module" src="script.js"></script>
+    <!-- Firebase App Configuration -->
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+        
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBQieeHbz8glgWcp8_BDdoNFGGnBjodbRk",
+            authDomain: "apigame-34134.firebaseapp.com",
+            projectId: "apigame-34134",
+            storageBucket: "apigame-34134.firebasestorage.app",
+            messagingSenderId: "648910176965",
+            appId: "1:648910176965:web:d93bf1f3348d9c3d60a6ac",
+            measurementId: "G-WYL7L5K6C7"
+        };
+
+        // Initialize Firebase
+        try {
+            const app = initializeApp(firebaseConfig);
+            console.log("Firebase initialized successfully");
+        } catch (error) {
+            console.error("Firebase initialization error:", error);
+        }
+    </script>
     
+    <!-- Main application script -->
+    <script type="module" src="script.js"></script>
 </body>
 </html>
