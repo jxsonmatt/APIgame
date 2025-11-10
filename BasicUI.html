@@ -93,17 +93,35 @@
         </main>
     </div>
 
-    <!-- Banana API Challenge Modal -->
+    <!-- Banana API Challenge Modal Structure -->
+    <!-- This modal appears when users run out of money or click the challenge button -->
     <div id="bananaModal" class="modal">
+        <!-- Modal content wrapper - centers content and provides styling -->
         <div class="modal-content">
+            <!-- Challenge title and explanation -->
             <h2>Earn $100 - Solve the Challenge!</h2>
             <p>You're out of money! Solve this challenge to earn $100.</p>
+            
+            <!-- Main challenge container -->
             <div id="bananaChallenge">
+                <!-- Dynamic image loaded from Banana API -->
+                <!-- src is empty initially, filled by JavaScript when modal opens -->
                 <img id="bananaImage" src="" alt="Banana Challenge">
+                
+                <!-- User input section -->
                 <p>What's the correct answer?</p>
+                <!-- Numeric input restricted to single digits 0-9 -->
                 <input type="number" id="bananaAnswer" min="0" max="9">
+                
+                <!-- Result message container - shows success/failure messages -->
+                <!-- Style margin adds space between input and message -->
+                <p id="bananaResult" style="margin-top:10px;"></p>
+                
+                <!-- Action buttons container -->
                 <div class="btn-row">
+                    <!-- Submit button triggers answer validation -->
                     <button class="primary" id="submitBanana">Submit Answer</button>
+                    <!-- Skip button closes modal without reward -->
                     <button id="skipBanana">Skip</button>
                 </div>
             </div>

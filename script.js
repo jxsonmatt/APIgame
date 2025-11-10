@@ -373,59 +373,118 @@ function updateHUD(){
 }
 
 // --- User actions ---
-// Banana Challenge simple handlers (from user snippet), integrated with user state
 let bananaSolution = null;
 
-$('tryBanana').addEventListener('click', async () => {
-    const modal = $('bananaModal');
-    modal.classList.add('show');
+// Event handler for when user clicks "Try Banana Challenge" button
+document.getElementById("tryBanana").addEventListener("click", async () => {
+  // Get references to DOM elements we'll need to manipulate
+  const modal = document.getElementById("bananaModal");
+  const resultElement = document.getElementById("bananaResult");
+  const answerInput = document.getElementById("bananaAnswer");
+  
+  // Reset the UI state for a fresh challenge
+  modal.style.display = "block";      // Show the modal
+  resultElement.textContent = '';     // Clear any previous result message
+  answerInput.value = '';            // Clear any previous answer
+  
+  try {
+    // CORS Proxy Setup
+    // We use a proxy because the Banana API doesn't support direct browser requests (CORS issues)
+    const proxyUrl = "https://corsproxy.io/?";
+    // Target URL with parameters:
+    // - out=json: Request JSON response format
+    // - base64=yes: Get image as base64 string instead of URL
+    const targetUrl = "http://marcconrad.com/uob/banana/api.php?out=json&base64=yes";
 
-    try {
-        // protocol-aware API URL to reduce mixed-content issues
-        const proto = (location && location.protocol === 'https:') ? 'https:' : 'http:';
-        const apiUrl = `${proto}//marcconrad.com/uob/banana/api.php?out=json`;
-        const response = await fetch(apiUrl);
-        const data = await response.json();
+    // Make the API request through the proxy
+    // encodeURIComponent ensures the URL is properly encoded for the proxy
+    const response = await fetch(proxyUrl + encodeURIComponent(targetUrl));
+    const data = await response.json();
 
-        const imgEl = $('bananaImage');
-        // API may return question (URL) or image (base64) depending on parameters
-        if (data.question) imgEl.src = data.question;
-        else if (data.image) imgEl.src = `data:image/png;base64,${data.image}`;
-        else imgEl.src = '';
+    // Set the challenge image using base64 data
+    // data:image/png;base64 prefix tells browser this is a base64 encoded PNG
+    document.getElementById("bananaImage").src = "data:image/png;base64," + data.question;
+    
+    // Store the correct answer for later comparison
+    bananaSolution = data.solution;
 
-        bananaSolution = String(data.solution ?? data[1] ?? '');
-
-        log('Starting Banana Challenge...');
-    } catch (error) {
-        log('Failed to load Banana Challenge. Common causes: mixed HTTP/HTTPS or CORS restrictions.');
-        console.error('Banana API error:', error);
-    }
+    log('Starting Banana Challenge...');
+  } catch (error) {
+    console.error('Banana API error:', error);
+    log('Failed to load challenge image. Check console for details.');
+  }
 });
 
-// Submit handler
-$('submitBanana').addEventListener('click', () => {
-    const userAnswer = $('bananaAnswer').value.trim();
-    const modal = $('bananaModal');
-    const u = users.find(x=>x.id===currentUserId);
-    if (!u) return;
+// Event handler for when user submits their answer
+document.getElementById("submitBanana").addEventListener("click", () => {
+  // Get user's answer and remove any whitespace
+  const userAnswer = document.getElementById("bananaAnswer").value.trim();
+  
+  // Get references to DOM elements we need
+  const modal = document.getElementById("bananaModal");
+  const resultElement = document.getElementById("bananaResult");
+  
+  // Find the current user in our users array
+  const u = users.find(x=>x.id===currentUserId);
+  // Safety check: if no user found, exit early
+  if (!u) return;
 
-    if (userAnswer === bananaSolution) {
-        log('Challenge solved! +$100 reward.');
-        // Update user balance and persist
-        u.balance = Number(u.balance || 0) + 100;
-        saveUsers();
-        updateBalanceDisplay();
-        modal.classList.remove('show');
-    } else {
-        log('Challenge failed. Try again!');
-    }
+  // Convert both user's answer and stored solution to numbers
+  // This ensures consistent comparison (string "5" equals number 5)
+  const userNum = Number(userAnswer);
+  const solutionNum = Number(bananaSolution);
+
+  // Check if conversion was successful (!isNaN) and numbers match
+  if (!isNaN(userNum) && !isNaN(solutionNum) && userNum === solutionNum) {
+    // CORRECT ANSWER HANDLING
+    
+    // Visual feedback: Green success message
+    resultElement.style.color = '#4CAF50';  // Green color
+    resultElement.textContent = 'Correct! +$100 reward';
+    
+    // Log the success to game history
+    log('Challenge solved! +$100 reward.');
+    
+    // Update user's balance
+    u.balance = Number(u.balance || 0) + 100;  // Add $100 reward
+    saveUsers();  // Save to persistent storage
+    updateBalanceDisplay();  // Update UI to show new balance
+    
+    // Auto-close modal after showing success
+    setTimeout(() => {
+      modal.style.display = "none";  // Hide modal
+      resultElement.textContent = '';  // Clear result message
+    }, 1500);  // 1.5 second delay
+  } else {
+    // WRONG ANSWER HANDLING
+    
+    // Visual feedback: Red error message
+    resultElement.style.color = '#f44336';  // Red color
+    resultElement.textContent = 'Incorrect. Try again!';
+    
+    // Log the failure to game history
+    log('Challenge failed. Try again!');
+  }
 });
 
-// Skip handler
-$('skipBanana').addEventListener('click', () => {
-    $('bananaModal').classList.remove('show');
-    log('Banana Challenge skipped.');
+document.getElementById("skipBanana").addEventListener("click", () => {
+  document.getElementById("bananaModal").style.display = "none";
+  log('Banana Challenge skipped.');
 });
+
+// Utility functions (adapted to app helpers)
+function logMessage(msg) {
+  // reuse the existing log function so messages are timestamped and consistent
+  log(msg);
+}
+
+function updateBalance(amount) {
+  const u = users.find(x=>x.id===currentUserId);
+  if (!u) return;
+  u.balance = Number(u.balance || 0) + Number(amount || 0);
+  saveUsers();
+  updateBalanceDisplay();
+}
 
 addUserBtn.addEventListener('click',()=>{
     const name = prompt('New user name:','Player' + (users.length+1));

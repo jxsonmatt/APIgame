@@ -1,0 +1,31 @@
+Key points you can explain in your presentation:
+
+CORS and Proxy:
+
+Why we need a proxy (browser security)
+How the proxy helps access the API
+Why we use base64 for images
+Security Features:
+
+Input validation
+Number type conversion
+Safe balance updates
+Error handling
+User Experience:
+
+Clear feedback messages
+Color-coded results
+Automatic modal closing
+Balance updates
+History logging
+Technical Implementation:
+
+Async/await for API calls
+DOM manipulation
+State management
+Event handling
+Integration Points:
+
+How it connects with the game's balance system
+How it uses the existing logging system
+How it persists data changes
