@@ -83,6 +83,7 @@
                     <div style="display:flex;flex-direction:column;gap:8px">
                         <button id="revealAll" class="small">Reveal All</button>
                         <button id="newBoard" class="small">Clear Board</button>
+                        <button id="tryBanana" class="primary small">Try Banana Challenge ($100 Reward)</button>
                     </div>
                 </div>
                 <footer>
@@ -92,8 +93,24 @@
         </main>
     </div>
 
-    
-        <script type="module" src="script.js"></script>
+    <!-- Banana API Challenge Modal -->
+    <div id="bananaModal" class="modal">
+        <div class="modal-content">
+            <h2>Earn $100 - Solve the Challenge!</h2>
+            <p>You're out of money! Solve this challenge to earn $100.</p>
+            <div id="bananaChallenge">
+                <img id="bananaImage" src="" alt="Banana Challenge">
+                <p>What's the correct answer?</p>
+                <input type="number" id="bananaAnswer" min="0" max="9">
+                <div class="btn-row">
+                    <button class="primary" id="submitBanana">Submit Answer</button>
+                    <button id="skipBanana">Skip</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="script.js"></script>
     
 </body>
 </html>

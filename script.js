@@ -188,11 +188,73 @@ function endRoundWin(){
     resetRound();
 }
 
+// Banana API Challenge integration
+async function showBananaChallenge() {
+    try {
+        const response = await fetch('https://marcconrad.com/uob/banana/api.php');
+        const data = await response.json();
+        
+        const modal = $('bananaModal');
+        const img = $('bananaImage');
+        const answer = $('bananaAnswer');
+        
+        img.src = data.url;
+        answer.value = '';
+        modal.dataset.answer = data.solution;
+        modal.classList.add('show');
+        
+        return new Promise((resolve) => {
+            const submit = $('submitBanana');
+            const skip = $('skipBanana');
+            
+            function cleanup() {
+                submit.removeEventListener('click', handleSubmit);
+                skip.removeEventListener('click', handleSkip);
+                modal.classList.remove('show');
+            }
+            
+            function handleSubmit() {
+                const correct = Number(answer.value) === Number(modal.dataset.answer);
+                cleanup();
+                resolve(correct);
+            }
+            
+            function handleSkip() {
+                cleanup();
+                resolve(false);
+            }
+            
+            submit.addEventListener('click', handleSubmit);
+            skip.addEventListener('click', handleSkip);
+        });
+    } catch(e) {
+        console.error('Banana API error:', e);
+        return false;
+    }
+}
+
 function endRoundLose(){
     const u = users.find(x=>x.id===currentUserId);
-    if(u) log(`${u.name} hit a mine and lost $${fmt(game.lockedBet)}.`);
+    if(!u) return;
+    
+    log(`${u.name} hit a mine and lost $${fmt(game.lockedBet)}.`);
     renderBoard(true);
     resetRound();
+    
+    // Check if user is out of money
+    if(u.balance <= 0) {
+        log('Out of money! Time for a Banana Challenge!');
+        showBananaChallenge().then(success => {
+            if(success) {
+                u.balance += 100;
+                saveUsers();
+                updateBalanceDisplay();
+                log(`${u.name} solved the Banana Challenge and earned $100!`);
+            } else {
+                log('Better luck next time! Add more funds or try another challenge.');
+            }
+        });
+    }
 }
 
 function revealAll(showLog){
