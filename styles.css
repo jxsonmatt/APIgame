@@ -1,3 +1,731 @@
+:root {
+    /* Theme Variables: centralize palette so UI stays consistent across screens. */
+    --bg: #0f1724;
+    --card: #0b1220;
+    --accent: #08a0c3;
+    --danger: #e04b4b;
+    --muted: #98a1ad;
+    --tile: #16202b;
+    --tile-open: #e6f7fb;
+}
+
+/* Global Base: define fonts, background gradient, and default text color for the app shell. */
+html,
+body {
+    height: 100%;
+    margin: 0;
+    font-family: Inter, "Segoe UI", Arial, sans-serif;
+    background: linear-gradient(180deg, #081225 0%, #04101a 100%);
+    color: #e6eef6;
+}
+
+/* Wrapper Layout: constrain main content width and apply subtle glass effect. */
+.wrap {
+    max-width: 1000px;
+    margin: 28px auto;
+    padding: 20px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(2, 6, 23, 0.6);
+}
+
+/* Header Layout: align title, balance panel, and controls on one line. */
+header {
+    display: flex;
+    gap: 18px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* Headline Style: keep branding compact and highlight with accent color. */
+h1 {
+    font-size: 18px;
+    margin: 0;
+    color: var(--accent);
+}
+
+/* Control Panel: cluster dropdowns and inputs neatly. */
+.controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+/* Panel Card: provide backdrop for balance module. */
+.panel {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 12px;
+    border-radius: 10px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+/* Input Labels: keep helper text subtle yet legible. */
+label {
+    font-size: 12px;
+    color: var(--muted);
+}
+
+/* Control Inputs: standardize appearance of selects, numeric inputs, and buttons. */
+select,
+input[type="number"],
+button {
+    background: #07121a;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    color: inherit;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+/* Button Cursor: visually indicate clickability. */
+button {
+    cursor: pointer;
+}
+
+/* Balance Display: emphasize the player’s funds. */
+.balance {
+    font-weight: 700;
+    font-size: 18px;
+    color: #dff9ff;
+}
+
+/* Main Split: set up two-column layout for board and actions. */
+main {
+    display: flex;
+    gap: 20px;
+    margin-top: 18px;
+}
+
+/* Section Sizing: left hosts the board, right holds vertical controls. */
+.left {
+    flex: 1;
+}
+
+.right {
+    width: 320px;
+}
+
+/* Board Wrapper: add padding and subtle gradient around the grid. */
+.board-wrap {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
+    padding: 14px;
+    border-radius: 10px;
+}
+
+/* Minefield Grid: use CSS grid layout so tiles align in rows/columns. */
+.grid {
+    display: grid;
+    gap: 8px;
+    touch-action: manipulation;
+}
+
+/* Tile Default: render unopened cells with depth and hidden text. */
+.tile {
+    width: 56px;
+    height: 56px;
+    border-radius: 8px;
+    background: linear-gradient(180deg, var(--tile), #0c1b24);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: transparent;
+    font-weight: 700;
+    font-size: 16px;
+    user-select: none;
+    box-shadow: inset 0 -4px 8px rgba(0, 0, 0, 0.6);
+}
+
+/* Tile Open: show result when player uncovers a cell. */
+.tile.open {
+    background: var(--tile-open);
+    color: #052025;
+    box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* Tile Mine: paint detonated mines with danger palette. */
+.tile.mine {
+    background: linear-gradient(180deg, #3a1b1b, #2a0f0f);
+    color: var(--danger);
+    font-weight: 800;
+}
+
+/* Status Blocks: stack summary stats vertically. */
+.status {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Utility Text: reuse muted and big text styles across UI. */
+.big {
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.muted {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+/* Inline Action Row: keep quick actions on one line. */
+.actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* Accent Buttons: semantic helpers for primary and danger actions. */
+.danger {
+    background: var(--danger);
+    border: none;
+    color: #fff;
+}
+
+.primary {
+    background: var(--accent);
+    border: none;
+    color: #06232a;
+}
+
+/* Small Button Variant: reuse for compact links like Sign Out. */
+.small {
+    padding: 6px 8px;
+    font-size: 13px;
+    border-radius: 8px;
+}
+
+/* Footer Copy: keep low emphasis for legal text. */
+footer {
+    margin-top: 12px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+/* Game Layout: align board and vertical action rail with spacing. */
+.game-layout {
+    display: flex;
+    gap: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    align-items: flex-start;
+}
+
+/* Board Column: allow grid to shrink responsibly without overflow. */
+.game-container {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Vertical Actions: keep quick action buttons sticky beside the board. */
+.vertical-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    width: 200px;
+    position: sticky;
+    top: 20px;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 20px;
+    border-radius: 12px;
+}
+
+/* Game Buttons: style action buttons with bold uppercase presentation. */
+.game-button {
+    padding: 12px 24px !important;
+    font-size: 14px !important;
+    border-radius: 8px !important;
+    transition: all 0.3s ease !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+    background: #2d2d2d !important;
+    color: #fff !important;
+    border: 2px solid #3d3d3d !important;
+    white-space: nowrap;
+}
+
+/* Game Button Hover: lighten surface on hover for depth feedback. */
+.game-button:hover {
+    background: #3d3d3d !important;
+    border-color: #4d4d4d !important;
+    transform: translateY(-2px);
+}
+
+/* Primary Game Button: highlight start/cash out actions in green. */
+.game-button.primary {
+    background: #4caf50 !important;
+    border-color: #45a049 !important;
+}
+
+.game-button.primary:hover {
+    background: #45a049 !important;
+    border-color: #388e3c !important;
+}
+
+/* Full-Width Action Button: ensure sticky buttons stretch evenly. */
+.action-button {
+    width: 100%;
+    font-size: 16px !important;
+    padding: 15px 0 !important;
+    text-align: center;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    min-height: 54px;
+}
+
+/* Highlighted Action: use blue gradient for standout CTA. */
+.action-button.highlight {
+    font-size: 18px !important;
+    font-weight: bold !important;
+    background: linear-gradient(45deg, #1976d2, #2196f3) !important;
+    border-color: #1976d2 !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.action-button.highlight:hover {
+    background: linear-gradient(45deg, #1565c0, #1976d2) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Banana CTA: orange gradient communicates bonus mini-game. */
+#tryBanana {
+    gap: 8px;
+    background: linear-gradient(45deg, #ff9800, #ffb74d) !important;
+    border-color: #ff9800 !important;
+    color: #1a1a1a !important;
+    font-weight: bold !important;
+    opacity: 0.85;
+    transition: all 0.3s ease !important;
+}
+
+#tryBanana:hover {
+    opacity: 1;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(255, 152, 0, 0.2);
+}
+
+/* Auth Modal Overlay: reuse .modal structure and apply glassmorphism styling. */
+.auth-modal {
+    background: #000c24;
+    backdrop-filter: blur(20px);
+    font-family: "Poppins", sans-serif;
+}
+
+/* Auth Backdrop Accent: optional radial highlights for glass look. */
+.auth-modal::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background:
+        radial-gradient(circle at center, rgba(107, 70, 193, 0.2), transparent 60%),
+        radial-gradient(circle at top right, rgba(255, 70, 131, 0.2), transparent 60%);
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* Auth Dialog: center card with translucent background and soft edges. */
+.auth-modal .modal-content {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(15px);
+    color: #ffffff;
+    border-radius: 18px;
+    padding: 40px 45px;
+    max-width: 340px;
+    width: 90%;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    text-align: center;
+}
+
+/* Auth Heading: adjust hierarchy for welcome message. */
+.auth-modal h2 {
+    color: #ffffff;
+    text-align: center;
+    margin-bottom: 30px;
+    font-size: 22px;
+    font-weight: 600;
+}
+
+/* Form Field Wrapper: allow labels and hints to stack. */
+.form-group {
+    margin-bottom: 24px;
+    position: relative;
+}
+
+/* Form Labels: keep instructions above inputs when used in sign up form. */
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* Form Inputs: mirror provided reference with rounded translucent fields. */
+.form-group input {
+    width: 100%;
+    padding: 12px 15px;
+    margin-bottom: 18px;
+    border: none;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    font-size: 14px;
+    transition: 0.3s;
+    outline: none;
+    box-sizing: border-box;
+}
+
+/* Input Focus: brighten field when user interacts. */
+.form-group input:focus {
+    background: rgba(255, 255, 255, 0.25);
+    outline: none;
+}
+
+/* Placeholder Text: keep helper text visible against dark background. */
+.form-group input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+/* Optional Focus Halo: reveal gradient glow when helper element is present. */
+.form-group input:focus + .focus-effect {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.focus-effect {
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(135deg, rgba(107, 70, 193, 0.2), rgba(255, 70, 131, 0.2));
+    border-radius: 18px;
+    opacity: 0;
+    transform: scale(0.95);
+    transition: all 0.3s ease;
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* Active Field: slightly brighten filled inputs even without focus. */
+.form-group input:not(:placeholder-shown) {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+/* Auth Button Column: stack primary and secondary actions vertically. */
+.auth-modal .btn-row {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 30px;
+}
+
+/* Auth Buttons: mirror reference sizing and spacing. */
+.auth-modal .btn-row button {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 600;
+    transition: 0.3s;
+}
+
+/* Auth Primary Button: use deep blue gradient for login/submit. */
+.auth-modal .btn-row .primary {
+    background: linear-gradient(90deg, #1a3e82, #0f1c49);
+    color: #ffffff;
+}
+
+.auth-modal .btn-row .primary:hover {
+    background: linear-gradient(90deg, #0f1c49, #1a3e82);
+}
+
+/* Auth Secondary Button: keep ghost button subtle for toggle action. */
+.auth-modal .btn-row button:not(.primary) {
+    background: rgba(255, 255, 255, 0.08);
+    color: #e0e0e0;
+}
+
+.auth-modal .btn-row button:not(.primary):hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+/* Form Options: align Remember Me toggle and password link. */
+.form-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    margin-bottom: 25px;
+}
+
+/* Remember Me: cluster checkbox and label. */
+.remember-me {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    color: #ffffff;
+    font-size: 13px;
+}
+
+/* Forgot Password Link: provide blue accent hover behaviour. */
+.forgot-password {
+    color: #9ecbff;
+    text-decoration: none;
+    font-size: 13px;
+    transition: 0.3s;
+}
+
+.forgot-password:hover {
+    text-decoration: underline;
+}
+
+/* Autofill Tuning: keep browser autofill from overriding color scheme. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #ffffff;
+    -webkit-box-shadow: 0 0 0px 1000px rgba(255, 255, 255, 0.08) inset;
+    transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Auth Error Banner: style failure feedback with warm gradient and animation. */
+#authError {
+    background: linear-gradient(to right, #ff416c, #ff4b2b);
+    color: #ffffff;
+    padding: 16px;
+    border-radius: 12px;
+    margin-top: 15px;
+    font-size: 14px;
+    text-align: center;
+    display: none;
+    animation: slideIn 0.3s ease-out;
+    box-shadow: 0 4px 12px rgba(255, 75, 43, 0.2);
+}
+
+/* Auth Success Banner: reuse structure with green gradient for positive feedback. */
+.auth-success {
+    background: linear-gradient(to right, #43a047, #66bb6a);
+    color: #ffffff;
+    padding: 16px;
+    border-radius: 12px;
+    margin-top: 15px;
+    font-size: 14px;
+    text-align: center;
+    display: none;
+    animation: slideIn 0.3s ease-out;
+    box-shadow: 0 4px 12px rgba(67, 160, 71, 0.2);
+}
+
+/* Success Checkmark: animate completion indicator over buttons. */
+.success-checkmark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+    color: #ffffff;
+    font-size: 24px;
+}
+
+.success-checkmark.show {
+    display: block;
+    animation: checkmark 0.5s ease-in-out forwards;
+}
+
+/* Auth Form Transitions: fade between sign-in and sign-up states. */
+#signInForm,
+#signUpForm {
+    transition: all 0.5s ease;
+    opacity: 1;
+    position: relative;
+}
+
+#signInForm.hidden,
+#signUpForm.hidden {
+    opacity: 0;
+    transform: translateY(10px);
+}
+
+/* User Info Badge: show logged-in user name with pill styling. */
+#userInfo {
+    background: #2d2d2d;
+    padding: 8px 15px;
+    border-radius: 25px;
+    display: inline-flex;
+    align-items: center;
+    gap: 15px;
+    margin: 10px;
+}
+
+/* Username Color: highlight display name in green. */
+#currentUsername {
+    color: #4caf50;
+    font-weight: 500;
+}
+
+/* Sign-Out Button: blend with badge but remain clickable. */
+#signOut {
+    background: #333333;
+    color: #ffffff;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+#signOut:hover {
+    background: #444444;
+    transform: translateY(-1px);
+}
+
+/* Modal Shell: shared overlay setup for auth and banana challenge. */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.show {
+    display: flex;
+}
+
+/* Banana Modal Card: reuse game palette for puzzle overlay. */
+.modal-content {
+    background: var(--card);
+    padding: 20px;
+    border-radius: 12px;
+    max-width: 500px;
+    width: 90%;
+    text-align: center;
+}
+
+.modal h2 {
+    color: var(--accent);
+    margin: 0 0 16px;
+}
+
+.modal img {
+    max-width: 100%;
+    border-radius: 8px;
+    margin: 12px 0;
+}
+
+.modal input[type="number"] {
+    width: 100px;
+    margin: 12px;
+}
+
+/* Banana Buttons: keep horizontal spacing for submit/skip. */
+.modal .btn-row {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 16px;
+}
+
+/* Loading State: overlay spinner on buttons during network work. */
+.button-loading {
+    position: relative;
+    cursor: wait !important;
+    opacity: 0.7;
+}
+
+.button-loading::after {
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 50%;
+    right: 10px;
+    margin-top: -8px;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    border-right-color: transparent;
+    animation: button-loading-spinner 0.75s linear infinite;
+}
+
+/* Animations: reusable motion for floating chips, shake feedback, and banners. */
+@keyframes floatUp {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: translate(-50%, -200%) scale(1.5);
+        opacity: 0;
+    }
+}
+
+@keyframes shake {
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+    25% {
+        transform: translateX(-10px);
+    }
+    75% {
+        transform: translateX(10px);
+    }
+}
+
+.shake {
+    animation: shake 0.5s ease-in-out;
+}
+
+@keyframes checkmark {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-10px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes button-loading-spinner {
+    from {
+        transform: rotate(0turn);
+    }
+    to {
+        transform: rotate(1turn);
+    }
+}
 :root{
     --bg:#0f1724; --card:#0b1220; --accent:#08a0c3; --danger:#e04b4b; --muted:#98a1ad;
     --tile:#16202b; --tile-open:#e6f7fb;
