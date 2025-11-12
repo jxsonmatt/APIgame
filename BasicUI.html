@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
+    <!-- Set up metadata, title, and global styles for the single-page game UI. -->
     <meta charset="utf-8" />
     <title>Minefield Gamble — Basic UI</title>
     <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -8,14 +9,14 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
-    <!-- Auth Modal -->
+    <!-- Fullscreen modal that handles sign-in and sign-up before the game starts. -->
     <div id="authModal" class="modal auth-modal">
         <div class="modal-content">
             <h2 id="authTitle">Welcome to Minefield Gamble</h2>
             
-            <!-- Auth Forms -->
+            <!-- Container swaps between login and registration forms. -->
             <div id="authForms">
-                <!-- Sign In Form -->
+                <!-- Email/password login form shown by default. -->
                 <form id="signInForm">
                     <div class="form-group">
                         <input type="email" id="signInEmail" required placeholder="Email ID">
@@ -36,7 +37,7 @@
                     </div>
                 </form>
 
-                <!-- Sign Up Form (initially hidden) -->
+                <!-- Registration form revealed when players choose to create a new account. -->
                 <form id="signUpForm" style="display: none;">
                     <div class="form-group">
                         <label for="signUpUsername">Choose a Username</label>
@@ -58,7 +59,7 @@
                 </form>
             </div>
 
-            <!-- Auth Error Message -->
+            <!-- Inline error surface for authentication issues. -->
             <p id="authError"></p>
         </div>
     </div>
@@ -69,7 +70,7 @@
                 <h1>Minefield Gamble — Basic UI</h1>
                 <div class="muted">Click squares to uncover. Mines lose the round. Cash out winnings while you can.</div>
             </div>
-            <!-- Add User Info Display -->
+            <!-- Signed-in player badge with a one-click sign-out control. -->
             <div id="userInfo" style="text-align: right; margin-bottom: 10px;">
                 <span id="currentUsername"></span>
                 <button id="signOut" class="small">Sign Out</button>
@@ -90,6 +91,7 @@
                 <div class="game-container">
                     <div class="board-wrap">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                            <!-- Left cluster: board size and mine density controls. -->
                             <div style="display:flex;gap:8px;align-items:center">
                                 <label class="muted">Grid</label>
                                 <select id="gridSize">
@@ -101,6 +103,7 @@
                                 <input id="mineCount" type="number" min="1" max="20" value="5" style="width:72px">
                             </div>
 
+                            <!-- Right cluster: bet amount and round actions. -->
                             <div style="display:flex;gap:8px;align-items:center">
                                 <label class="muted">Bet</label>
                                 <input id="betAmount" type="number" min="1" value="10" style="width:100px">
@@ -110,6 +113,7 @@
                         </div>
 
                         <div id="info" style="display:flex;gap:18px;margin-bottom:12px">
+                            <!-- Heads-up display with live round stats. -->
                             <div>
                                 <div class="muted">Picked</div>
                                 <div id="pickedCount" class="big">0</div>
@@ -128,21 +132,20 @@
                     </div>
                 </div>
 
-                <!-- Vertical Action Buttons -->
+                <!-- Vertical button column for utility actions beside the board. -->
                 <div class="vertical-actions">
                     <button id="revealAll" class="game-button action-button">REVEAL ALL</button>
                     <button id="newBoard" class="game-button action-button highlight">CLEAR BOARD</button>
                     <button id="tryBanana" class="game-button action-button">🍌 PLAY CHALLENGE</button>
                 </div>
 
-                <!-- Hidden log for functionality -->
+                <!-- Hidden div that the script uses as an activity log feed. -->
                 <div id="log" style="display:none"></div>
             </div>
         </main>
     </div>
 
-    <!-- Banana API Challenge Modal Structure -->
-    <!-- This modal appears when users run out of money or click the challenge button -->
+    <!-- Banana Challenge modal appears when bankroll hits zero or the button is pressed. -->
     <div id="bananaModal" class="modal">
         <!-- Modal content wrapper - centers content and provides styling -->
         <div class="modal-content">
@@ -177,6 +180,7 @@
     </div>
 
     <!-- Firebase App Configuration -->
+    <!-- Lightweight bootstrap so Firebase is initialized even before the module loads. -->
     <script type="module">
         // Import the functions you need from the SDKs you need
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";

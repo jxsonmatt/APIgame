@@ -1,4 +1,4 @@
-// Firebase SDK Imports (version 9.x)
+// Import the modular Firebase SDK pieces we need for auth and Firestore access.
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
 import {
     getAuth,
@@ -19,7 +19,7 @@ import {
     serverTimestamp
 } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
-// Firebase Configuration
+// Firebase project configuration pulled from the Firebase console for this game client.
 const firebaseConfig = {
     apiKey: "AIzaSyBQieeHbz8glgWcp8_BDdoNFGGnBjodbRk",
     authDomain: "apigame-34134.firebaseapp.com",
@@ -30,7 +30,7 @@ const firebaseConfig = {
     measurementId: "G-WYL7L5K6C7"
 };
 
-// Initialize Firebase
+// Initialize (or reuse) the Firebase app instance so the SDK can talk to the backend services.
 let app;
 try {
     app = getApps().length ? getApp() : initializeApp(firebaseConfig);
@@ -39,17 +39,17 @@ try {
     uiLog("Firebase initialization failed. Check console for details.");
 }
 
-// Initialize Firebase services
+// Set up handles for Authentication and Firestore once the app is available.
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Firebase initialization and Firestore sync will be initialized after UI helpers are defined below.
+// Additional Firebase-powered helpers are defined below so they can share the same context.
 
-// Basic client-side UI for a minefield gamble prototype.
+// DOM helper to grab elements and currency formatter shared across the UI.
 const $ = id => document.getElementById(id);
 const fmt = v => Number(v).toFixed(2);
 
-// --- State ---
+// Track the live round state; this drives the board rendering and balance calculations.
 let game = {
     active: false,
     gridSize: 5,
@@ -61,11 +61,12 @@ let game = {
     lockedBet: 0
 };
 
+// Cache the signed-in user, their synced balance, and a listener cleanup handle.
 let currentUser = null;
 let userBalance = 0;
 let unsubscribeUserDoc = null;
 
-// --- Init UI refs ---
+// Cache all recurring DOM lookups so handlers don’t keep querying the document.
 const balanceEl = $('balance');
 const gridEl = $('grid');
 const gridSizeEl = $('gridSize');
@@ -89,6 +90,7 @@ const userInfo = $('userInfo');
 const currentUsername = $('currentUsername');
 const signOutBtn = $('signOut');
 
+// Hide auth-dependent UI until Firebase notifies us about the session state.
 if (userInfo) {
     userInfo.style.display = 'none';
 }
@@ -96,6 +98,7 @@ if (currentUsername) {
     currentUsername.textContent = '';
 }
 
+// Reflect the player’s bankroll in the header, or placeholder text if not signed in yet.
 function updateBalanceDisplay() {
     if (!currentUser) {
         balanceEl.textContent = '--';
@@ -104,15 +107,18 @@ function updateBalanceDisplay() {
 
     balanceEl.textContent = '$' + fmt(userBalance);
 }
+// Append timestamped messages into the debug log feed shown in the UI.
 function log(msg){
     const t = new Date().toLocaleTimeString();
     logEl.innerHTML = `<div>[${t}] ${msg}</div>` + logEl.innerHTML;
 }
 
+// Convenience helper so every function uses the same location for Firestore docs.
 function getUserDocRef(uid) {
     return doc(db, 'users', uid);
 }
 
+// Make sure each authenticated player has a Firestore document with required fields.
 async function ensureUserDocument(user) {
     if (!user) return;
 
@@ -120,6 +126,7 @@ async function ensureUserDocument(user) {
     const snapshot = await getDoc(ref);
 
     if (!snapshot.exists()) {
+        // Seed first-time players with a starting balance and metadata timestamps.
         await setDoc(ref, {
             username: user.displayName || null,
             email: user.email || null,
@@ -133,6 +140,7 @@ async function ensureUserDocument(user) {
     const data = snapshot.data() || {};
     const updates = {};
 
+    // Fill in defaults if older docs are missing fields.
     if (data.balance == null) {
         updates.balance = 100;
     }
@@ -144,11 +152,13 @@ async function ensureUserDocument(user) {
     }
 
     if (Object.keys(updates).length) {
+        // Only write back when we actually changed something to avoid needless writes.
         updates.updatedAt = serverTimestamp();
         await updateDoc(ref, updates);
     }
 }
 
+// Stop listening to Firestore updates when a different user signs in/out.
 function clearUserSubscription() {
     if (unsubscribeUserDoc) {
         unsubscribeUserDoc();
@@ -156,6 +166,7 @@ function clearUserSubscription() {
     }
 }
 
+// Subscribe to balance changes for the active player so the UI stays live.
 function subscribeToUserDocument(user) {
     clearUserSubscription();
     if (!user) return;
@@ -171,6 +182,7 @@ function subscribeToUserDocument(user) {
     });
 }
 
+// Atomically add or remove chips from the player’s bankroll while enforcing no overdraft.
 async function adjustBalance(delta) {
     if (!currentUser) {
         throw new Error('No authenticated user');
@@ -178,10 +190,12 @@ async function adjustBalance(delta) {
 
     const ref = getUserDocRef(currentUser.uid);
 
+    // Use a Firestore transaction so concurrent plays never corrupt the balance.
     const updatedBalance = await runTransaction(db, async (transaction) => {
         const snapshot = await transaction.get(ref);
 
         if (!snapshot.exists()) {
+            // If the document vanished, recreate it with default funds and our delta applied.
             const startingBalance = Math.max(0, 100 + delta);
             transaction.set(ref, {
                 username: currentUser.displayName || null,
@@ -198,6 +212,7 @@ async function adjustBalance(delta) {
         const nextBalance = currentBalanceValue + delta;
 
         if (nextBalance < 0) {
+            // Throwing aborts the transaction so callers know the bet cannot proceed.
             const err = new Error('Insufficient funds');
             err.code = 'INSUFFICIENT_FUNDS';
             throw err;
@@ -217,6 +232,7 @@ async function adjustBalance(delta) {
 }
 
 // --- Board generation & game logic ---
+// Build the full tile array for a new board including random mine placement.
 function createBoard(size, mines){
     const total = size*size;
     const arr = new Array(total).fill(0).map((_,i)=>({index:i,mine:false,opened:false}));
@@ -230,6 +246,7 @@ function createBoard(size, mines){
     return arr;
 }
 
+// Kick off a new round by locking the player’s bet and creating a fresh board.
 async function startRound(){
     if(game.active || !currentUser) return false;
 
@@ -290,6 +307,7 @@ async function startRound(){
     return true;
 }
 
+// Handle a user click on an individual tile and update round progress.
 function tileClick(idx){
     if(!game.active) return;
     const cell = game.board[idx];
@@ -310,6 +328,7 @@ function tileClick(idx){
     }
 }
 
+// Pay out the current potential winnings and close the round on demand.
 async function cashOut(){
     if(!game.active || !currentUser) return;
     const win = game.potential;
@@ -326,6 +345,7 @@ async function cashOut(){
     endRoundWin();
 }
 
+// Wrap win flow: reveal remaining tiles and reset controls.
 function endRoundWin(){
     // reveal board then reset
     renderBoard(true);
@@ -333,6 +353,7 @@ function endRoundWin(){
 }
 
 // Banana API Challenge integration
+// Launch the Banana Challenge modal that lets busted players earn extra funds.
 async function showBananaChallenge() {
     const modal = $('bananaModal');
     const img = $('bananaImage');
@@ -455,6 +476,7 @@ function endRoundLose(){
     resetRound();
 }
 
+// Flip every tile in the grid, optionally leaving a breadcrumb in the log.
 function revealAll(showLog){
     if(!game.board.length) {
         renderBoard(true);
@@ -464,6 +486,7 @@ function revealAll(showLog){
     if(showLog) log('All tiles revealed.');
 }
 
+// Return controls to their idle state so a new round can start cleanly.
 function resetRound(){
     game.active = false;
     game.lockedBet = 0;
@@ -474,6 +497,7 @@ function resetRound(){
 }
 
 // --- Rendering ---
+// Paint the game board based on the current model, optionally revealing hidden tiles.
 function renderBoard(reveal=false){
     const size = game.gridSize || 5;
     gridEl.style.gridTemplateColumns = `repeat(${size}, auto)`;
@@ -498,12 +522,14 @@ function renderBoard(reveal=false){
     }
 }
 
+// Refresh the live stats panel so the player sees their progress.
 function updateHUD(){
     pickedCountEl.textContent = game.picked || 0;
     payoutEl.textContent = '$' + fmt(game.potential || 0);
 }
 
 // --- User actions ---
+// Remember the current Banana Challenge answer so the submit handler can validate entries.
 let bananaSolution = null;
 
 // Event handler for when user clicks "Try Banana Challenge" button
@@ -518,7 +544,7 @@ document.getElementById("tryBanana").addEventListener("click", async () => {
   resultElement.textContent = '';     // Clear any previous result message
   answerInput.value = '';            // Clear any previous answer
   
-  try {
+    try {
     // CORS Proxy Setup
     // We use a proxy because the Banana API doesn't support direct browser requests (CORS issues)
     const proxyUrl = "https://corsproxy.io/?";
@@ -630,11 +656,13 @@ startBtn.addEventListener('click', async (e) => {
     }
 });
 
+// Wire the icon buttons into the game flow.
 cashBtn.addEventListener('click', cashOut);
 revealAllBtn.addEventListener('click', ()=>revealAll(true));
 newBoardBtn.addEventListener('click', ()=>{ game.board=[]; renderBoard(true); });
 
 // sync inputs
+// Clamp grid size updates and ensure mine count remains a valid value.
 gridSizeEl.addEventListener('change', ()=>{ 
     const newSize = Number(gridSizeEl.value);
     game.gridSize = newSize; 
@@ -643,6 +671,7 @@ gridSizeEl.addEventListener('change', ()=>{
     mineCountEl.max = String(maxMines);
     if(Number(mineCountEl.value) > maxMines) mineCountEl.value = String(maxMines);
 });
+// Keep the mine count sane even if people type outside the numeric input’s constraints.
 mineCountEl.addEventListener('change', ()=>{ 
     const val = Number(mineCountEl.value) || 1;
     const maxMines = Math.max(1, (Number(gridSizeEl.value) || game.gridSize) ** 2 - 1);
@@ -660,7 +689,7 @@ function initializeGame() {
     log('Game board initialized');
 }
 
-// Initialize everything when DOM is ready
+// Kick off the initial board render and balance display when the DOM is ready.
 document.addEventListener('DOMContentLoaded', () => {
     initializeGame();
     updateBalanceDisplay();
@@ -682,17 +711,20 @@ function uiLog(message) {
 }
 
 
-// Auth UI Functions
+// --- Authentication UI helpers ---
+// Show an error banner inside the auth dialog.
 function showAuthError(message) {
     authError.textContent = message;
     authError.style.display = 'block';
 }
 
+// Hide the auth error banner when retrying.
 function clearAuthError() {
     authError.textContent = '';
     authError.style.display = 'none';
 }
 
+// Toggle between the login and sign-up panes inside the modal.
 function toggleAuthForms() {
     signInForm.style.display = signInForm.style.display === 'none' ? 'block' : 'none';
     signUpForm.style.display = signUpForm.style.display === 'none' ? 'block' : 'none';
@@ -700,6 +732,7 @@ function toggleAuthForms() {
 }
 
 // Auth Event Handlers
+// Handle email/password sign-in submissions and ensure user metadata exists.
 signInForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     clearAuthError();
@@ -717,6 +750,7 @@ signInForm.addEventListener('submit', async (e) => {
     }
 });
 
+// Handle new account creation and seed the corresponding Firestore document.
 signUpForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     clearAuthError();
@@ -750,6 +784,7 @@ signUpForm.addEventListener('submit', async (e) => {
     }
 });
 
+// Disconnect the current user session when the pill button gets clicked.
 signOutBtn.addEventListener('click', async () => {
     try {
         await signOut(auth);
@@ -767,6 +802,7 @@ if (!auth.currentUser && authModal) {
     authModal.style.display = 'block';
 }
 
+// React to Firebase auth changes by wiring up Firestore listeners and updating the UI.
 onAuthStateChanged(auth, async (user) => {
     clearUserSubscription();
     currentUser = user || null;
@@ -785,6 +821,7 @@ onAuthStateChanged(auth, async (user) => {
             uiLog('Failed to load account data; please refresh the page.');
         }
     } else {
+        // Fall back to anonymous/idle UI when no authenticated session exists.
         currentUsername.textContent = '';
         userInfo.style.display = 'none';
         userBalance = 0;
