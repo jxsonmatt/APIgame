@@ -832,3 +832,5 @@ onAuthStateChanged(auth, async (user) => {
         }
     }
 });
+
+//supported by co-pilot
