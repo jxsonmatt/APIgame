@@ -65,6 +65,8 @@ let game = {
 let currentUser = null;
 let userBalance = 0;
 let unsubscribeUserDoc = null;
+let revealAllLocked = true;
+let newBoardLocked = true;
 
 // Cache all recurring DOM lookups so handlers don’t keep querying the document.
 const balanceEl = $('balance');
@@ -80,6 +82,7 @@ const roundStatusEl = $('roundStatus');
 const logEl = $('log');
 const revealAllBtn = $('revealAll');
 const newBoardBtn = $('newBoard');
+const tryBananaBtn = $('tryBanana');
 const authModal = $('authModal');
 const signInForm = $('signInForm');
 const signUpForm = $('signUpForm');
@@ -100,17 +103,60 @@ if (currentUsername) {
 
 // Reflect the player’s bankroll in the header, or placeholder text if not signed in yet.
 function updateBalanceDisplay() {
+    if (!balanceEl) {
+        updateActionIndicators();
+        return;
+    }
+
     if (!currentUser) {
         balanceEl.textContent = '--';
+        updateActionIndicators();
         return;
     }
 
     balanceEl.textContent = '$' + fmt(userBalance);
+    updateActionIndicators();
 }
 // Append timestamped messages into the debug log feed shown in the UI.
 function log(msg){
     const t = new Date().toLocaleTimeString();
     logEl.innerHTML = `<div>[${t}] ${msg}</div>` + logEl.innerHTML;
+}
+
+// Update CTA states so the UI nudges players when their bankroll is low.
+function updateActionIndicators() {
+    if (!tryBananaBtn) {
+        return;
+    }
+
+    if (!currentUser) {
+        tryBananaBtn.classList.remove('balance-insufficient');
+        return;
+    }
+
+    const betValue = Number(betEl?.value ?? 0);
+    const hasBet = betValue > 0;
+    const needsFunds = userBalance <= 0 || (hasBet && userBalance < betValue);
+
+    tryBananaBtn.classList.toggle('balance-insufficient', needsFunds);
+}
+
+// Keep reveal/clear actions gated behind an active round so idle states are cleaner.
+function updateRoundActionButtons() {
+    const startEnabled = !startBtn?.disabled;
+    const allowInRoundActions = !startEnabled;
+
+    if (revealAllBtn) {
+        const shouldDisableReveal = !allowInRoundActions || revealAllLocked;
+        revealAllBtn.disabled = shouldDisableReveal;
+    }
+
+    if (newBoardBtn) {
+        const shouldDisableNewBoard = !allowInRoundActions || newBoardLocked;
+        newBoardBtn.disabled = shouldDisableNewBoard;
+    }
+
+    updateActionIndicators();
 }
 
 // Convenience helper so every function uses the same location for Firestore docs.
@@ -260,6 +306,7 @@ async function startRound(){
     }
 
     if(bet > userBalance){ 
+        updateActionIndicators();
         if (userBalance === 0 && roundStatusEl.textContent === 'Idle') {
             const playChallenge = confirm('💰 You\'re out of money! Want to try the Banana Challenge to earn $100?');
             if (playChallenge) {
@@ -281,6 +328,7 @@ async function startRound(){
     } catch (error) {
         if (error?.code === 'INSUFFICIENT_FUNDS') {
             alert('Insufficient balance for this bet');
+            updateActionIndicators();
         } else {
             console.error('Error locking bet:', error);
             uiLog('Failed to lock bet. Please try again.');
@@ -303,6 +351,9 @@ async function startRound(){
     log(`${currentUser.displayName || currentUser.email || 'Player'} started a round with $${fmt(bet)} on ${gridSize}x${gridSize} (${game.mineCount} mines)`);
     startBtn.disabled = true;
     cashBtn.disabled = false;
+    revealAllLocked = false;
+    newBoardLocked = false;
+    updateRoundActionButtons();
     roundStatusEl.textContent = 'In progress';
     return true;
 }
@@ -490,9 +541,12 @@ function revealAll(showLog){
 function resetRound(){
     game.active = false;
     game.lockedBet = 0;
-    startBtn.disabled = false;
+    startBtn.disabled = true;
     cashBtn.disabled = true;
-    roundStatusEl.textContent = 'Idle';
+    revealAllLocked = true;
+    newBoardLocked = false;
+    updateRoundActionButtons();
+    roundStatusEl.textContent = 'Round Over';
     updateHUD();
 }
 
@@ -658,8 +712,28 @@ startBtn.addEventListener('click', async (e) => {
 
 // Wire the icon buttons into the game flow.
 cashBtn.addEventListener('click', cashOut);
-revealAllBtn.addEventListener('click', ()=>revealAll(true));
-newBoardBtn.addEventListener('click', ()=>{ game.board=[]; renderBoard(true); });
+revealAllBtn.addEventListener('click', () => {
+    revealAll(true);
+    revealAllLocked = true;
+    updateRoundActionButtons();
+});
+
+newBoardBtn.addEventListener('click', () => {
+    game.active = false;
+    game.board = createBoard(game.gridSize, 0);
+    game.picked = 0;
+    game.potential = 0;
+    game.lockedBet = 0;
+    renderBoard(true);
+    revealAllLocked = true;
+    newBoardLocked = true;
+    startBtn.disabled = false;
+    cashBtn.disabled = true;
+    roundStatusEl.textContent = 'Idle';
+    updateRoundActionButtons();
+    updateActionIndicators();
+    updateHUD();
+});
 
 // sync inputs
 // Clamp grid size updates and ensure mine count remains a valid value.
@@ -680,6 +754,11 @@ mineCountEl.addEventListener('change', ()=>{
     mineCountEl.value = String(game.mineCount);
 });
 
+if (betEl) {
+    betEl.addEventListener('input', updateActionIndicators);
+    betEl.addEventListener('change', updateActionIndicators);
+}
+
 // --- Startup ---
 // Initialize game board immediately
 function initializeGame() {
@@ -687,6 +766,7 @@ function initializeGame() {
     renderBoard(true);
     updateHUD();
     log('Game board initialized');
+    updateRoundActionButtons();
 }
 
 // Kick off the initial board render and balance display when the DOM is ready.

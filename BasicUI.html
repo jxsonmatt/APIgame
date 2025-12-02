@@ -70,17 +70,19 @@
                 <h1>Minefield Gamble — Basic UI</h1>
                 <div class="muted">Click squares to uncover. Mines lose the round. Cash out winnings while you can.</div>
             </div>
-            <!-- Signed-in player badge with a one-click sign-out control. -->
-            <div id="userInfo" style="text-align: right; margin-bottom: 10px;">
-                <span id="currentUsername"></span>
-                <button id="signOut" class="small">Sign Out</button>
-            </div>
+            <div class="header-actions">
+                <!-- Signed-in player badge with a one-click sign-out control. -->
+                <div id="userInfo">
+                    <span id="currentUsername"></span>
+                    <button id="signOut" class="small">Sign Out</button>
+                </div>
 
-            <div class="controls">
-                <div class="panel">
-                    <div>
-                        <div class="muted">Balance</div>
-                        <div id="balance" class="balance">--</div>
+                <div class="controls">
+                    <div class="panel">
+                        <div>
+                            <div class="muted">Balance</div>
+                            <div id="balance" class="balance">--</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -90,26 +92,19 @@
             <div class="game-layout">
                 <div class="game-container">
                     <div class="board-wrap">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-                            <!-- Left cluster: board size and mine density controls. -->
-                            <div style="display:flex;gap:8px;align-items:center">
-                                <label class="muted">Grid</label>
-                                <select id="gridSize">
-                                    <option value="5">5 × 5</option>
-                                    <option value="6">6 × 6</option>
-                                    <option value="7">7 × 7</option>
-                                </select>
-                                <label class="muted">Mines</label>
-                                <input id="mineCount" type="number" min="1" max="20" value="5" style="width:72px">
-                            </div>
-
-                            <!-- Right cluster: bet amount and round actions. -->
-                            <div style="display:flex;gap:8px;align-items:center">
-                                <label class="muted">Bet</label>
-                                <input id="betAmount" type="number" min="1" value="10" style="width:100px">
-                                <button id="startRound" class="primary game-button">Start Round</button>
-                                <button id="cashOut" class="game-button" disabled>Cash Out</button>
-                            </div>
+                        <div class="round-controls">
+                            <label for="gridSize" class="muted">Grid</label>
+                            <select id="gridSize">
+                                <option value="5">5 × 5</option>
+                                <option value="6">6 × 6</option>
+                                <option value="7">7 × 7</option>
+                            </select>
+                            <label for="mineCount" class="muted">Mines</label>
+                            <input id="mineCount" type="number" min="1" max="20" value="5" style="width:40px">
+                            <label for="betAmount" class="muted">Bet</label>
+                            <input id="betAmount" type="number" min="1" value="10" style="width:60px">
+                            <button id="startRound" class="primary game-button">Start Round</button>
+                            <button id="cashOut" class="game-button" disabled>Cash Out</button>
                         </div>
 
                         <div id="info" style="display:flex;gap:18px;margin-bottom:12px">
