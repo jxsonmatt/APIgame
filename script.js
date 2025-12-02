@@ -67,6 +67,7 @@ let userBalance = 0;
 let unsubscribeUserDoc = null;
 let revealAllLocked = true;
 let newBoardLocked = true;
+let bananaSubmissionLocked = false;
 
 // Cache all recurring DOM lookups so handlers don’t keep querying the document.
 const balanceEl = $('balance');
@@ -83,6 +84,7 @@ const logEl = $('log');
 const revealAllBtn = $('revealAll');
 const newBoardBtn = $('newBoard');
 const tryBananaBtn = $('tryBanana');
+const submitBananaBtn = $('submitBanana');
 const authModal = $('authModal');
 const signInForm = $('signInForm');
 const signUpForm = $('signUpForm');
@@ -367,6 +369,8 @@ function tileClick(idx){
     if(cell.mine){
         // lose
         revealAll(true);
+        game.potential = 0;
+        updateHUD();
         endRoundLose();
     } else {
         game.picked++;
@@ -422,6 +426,11 @@ async function showBananaChallenge() {
         modal.dataset.answer = String(solution);
         modal.classList.add('show');
         answer.focus();
+
+        bananaSubmissionLocked = false;
+        if (submitBananaBtn) {
+            submitBananaBtn.disabled = false;
+        }
 
         return new Promise((resolve) => {
             const submit = $('submitBanana');
@@ -597,6 +606,11 @@ document.getElementById("tryBanana").addEventListener("click", async () => {
   modal.style.display = "block";      // Show the modal
   resultElement.textContent = '';     // Clear any previous result message
   answerInput.value = '';            // Clear any previous answer
+
+    bananaSubmissionLocked = false;
+    if (submitBananaBtn) {
+            submitBananaBtn.disabled = false;
+    }
   
     try {
     // CORS Proxy Setup
@@ -628,74 +642,104 @@ document.getElementById("tryBanana").addEventListener("click", async () => {
 
 // Event handler for when user submits their answer
 document.getElementById("submitBanana").addEventListener("click", async () => {
-        // Get user's answer and remove any whitespace
-        const userAnswer = document.getElementById("bananaAnswer").value.trim();
+    if (bananaSubmissionLocked) {
+        return;
+    }
 
-        // Get references to DOM elements we need
-        const modal = document.getElementById("bananaModal");
-        const resultElement = document.getElementById("bananaResult");
+    const submitButton = submitBananaBtn || document.getElementById("submitBanana");
+    const answerInput = document.getElementById("bananaAnswer");
+    const resultElement = document.getElementById("bananaResult");
+    const modal = document.getElementById("bananaModal");
 
-        if (!currentUser) return;
+    // Get user's answer and remove any whitespace
+    const userAnswer = answerInput.value.trim();
 
-        // Convert both user's answer and stored solution to numbers
-        const userNum = Number(userAnswer);
-        const solutionNum = Number(bananaSolution);
+    if (!currentUser) {
+        return;
+    }
 
-        if (!isNaN(userNum) && !isNaN(solutionNum) && userNum === solutionNum) {
-                // CORRECT ANSWER HANDLING
-                try {
-                        await adjustBalance(100);
+    // Convert both user's answer and stored solution to numbers
+    const userNum = Number(userAnswer);
+    const solutionNum = Number(bananaSolution);
 
-                        // Visual feedback: Green success message
-                        resultElement.style.color = '#4CAF50';
-                        resultElement.textContent = '🎉 Correct! You earned $100! 🎉';
+    if (isNaN(userNum)) {
+        resultElement.style.color = '#f44336';
+        resultElement.textContent = 'Enter a valid number to submit.';
+        return;
+    }
 
-                        // Show success message in game log
-                        log('🌟 Banana Challenge completed successfully! +$100 added to your balance.');
+    bananaSubmissionLocked = true;
+    if (submitButton) {
+        submitButton.disabled = true;
+    }
 
-                        // Auto-close modal after showing success
-                        setTimeout(() => {
-                                modal.style.display = "none";
-                                resultElement.textContent = '';
-                        }, 2000);
+    if (!isNaN(solutionNum) && userNum === solutionNum) {
+        // CORRECT ANSWER HANDLING
+        try {
+            await adjustBalance(100);
 
-                        // Create success animation
-                        const successMsg = document.createElement('div');
-                        successMsg.textContent = '+$100';
-                        successMsg.style.cssText = `
-                                position: fixed;
-                                top: 50%;
-                                left: 50%;
-                                transform: translate(-50%, -50%);
-                                color: #4CAF50;
-                                font-size: 48px;
-                                font-weight: bold;
-                                animation: floatUp 2s ease-out forwards;
-                                z-index: 1000;
-                        `;
-                        document.body.appendChild(successMsg);
-                        setTimeout(() => successMsg.remove(), 2000);
+            // Visual feedback: Green success message
+            resultElement.style.color = '#4CAF50';
+            resultElement.textContent = '🎉 Correct! You earned $100! 🎉';
 
-                } catch (error) {
-                        console.error('Error updating balance:', error);
-                        log('Error processing reward. Please try again.');
-                }
-        } else {
-                // WRONG ANSWER HANDLING
-                resultElement.style.color = '#f44336';
-                resultElement.textContent = '❌ Incorrect. Try again! ❌';
+            // Show success message in game log
+            log('🌟 Banana Challenge completed successfully! +$100 added to your balance.');
 
-                // Shake the input field to indicate error
-                const answerInput = document.getElementById("bananaAnswer");
-                answerInput.classList.add('shake');
-                setTimeout(() => answerInput.classList.remove('shake'), 500);
+            // Auto-close modal after showing success
+            setTimeout(() => {
+                modal.style.display = "none";
+                resultElement.textContent = '';
+            }, 2000);
 
-                log('❌ Challenge failed. Keep trying - you can do it!');
+            // Create success animation
+            const successMsg = document.createElement('div');
+            successMsg.textContent = '+$100';
+            successMsg.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                color: #4CAF50;
+                font-size: 48px;
+                font-weight: bold;
+                animation: floatUp 2s ease-out forwards;
+                z-index: 1000;
+            `;
+            document.body.appendChild(successMsg);
+            setTimeout(() => successMsg.remove(), 2000);
+
+        } catch (error) {
+            console.error('Error updating balance:', error);
+            log('Error processing reward. Please try again.');
+                        bananaSubmissionLocked = false;
+                        if (submitButton) {
+                            submitButton.disabled = false;
+                        }
         }
+    } else {
+        // WRONG ANSWER HANDLING
+        resultElement.style.color = '#f44336';
+        resultElement.textContent = '❌ Incorrect. Try again! ❌';
+
+        // Shake the input field to indicate error
+        answerInput.classList.add('shake');
+        setTimeout(() => answerInput.classList.remove('shake'), 500);
+
+        log('❌ Challenge failed. Keep trying - you can do it!');
+
+        bananaSubmissionLocked = false;
+        if (submitButton) {
+            submitButton.disabled = false;
+        }
+    }
 });
 
 document.getElementById("skipBanana").addEventListener("click", () => {
   document.getElementById("bananaModal").style.display = "none";
+    bananaSubmissionLocked = false;
+    if (submitBananaBtn) {
+            submitBananaBtn.disabled = false;
+    }
   log('Banana Challenge skipped.');
 });
 
@@ -718,7 +762,16 @@ revealAllBtn.addEventListener('click', () => {
     updateRoundActionButtons();
 });
 
-newBoardBtn.addEventListener('click', () => {
+newBoardBtn.addEventListener('click', async () => {
+    if (game.potential > 0 && game.active && currentUser) {
+        try {
+            await cashOut();
+        } catch (error) {
+            console.error('Auto cashout failed:', error);
+            return;
+        }
+    }
+
     game.active = false;
     game.board = createBoard(game.gridSize, 0);
     game.picked = 0;
